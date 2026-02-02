@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: biasharahub-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/biasharahub
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Use tenant_default at startup (Liquibase creates it); per-request schema is set by TenantFilter
+        default_schema: ${tenant.schema:tenant_default}
+        format_sql: true
+    open-in-view: false
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
+  cache:
+    type: simple
+  # Redis (uncomment when available)
+  # data:
+  #   redis:
+  #     host: ${REDIS_HOST:localhost}
+  #     port: ${REDIS_PORT:6379}
+
+server:
+  port: ${SERVER_PORT:5050}
+  servlet:
+    context-path: /api
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:biasharahub-super-secret-key-min-256-bits-required-for-hs256}
+  expiration-ms: 86400000  # 24 hours
+
+# CORS (adjust for production)
+cors:
+  allowed-origins: http://localhost:3000,http://127.0.0.1:3000
+
+# Swagger / OpenAPI (SpringDoc)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

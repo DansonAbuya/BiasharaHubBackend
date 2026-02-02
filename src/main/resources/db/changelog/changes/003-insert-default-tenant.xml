@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="003-insert-default-tenant" author="biasharahub">
+        <comment>Insert default tenant and create tenant_default schema</comment>
+        <sql>
+            INSERT INTO public.tenants (tenant_id, schema_name, name, domain, logo_url, primary_color, accent_color)
+            VALUES ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', 'tenant_default', 'BiasharaHub Demo', 'localhost', '/api/static/logo.png', '#2E7D32', '#FF8F00')
+            ON CONFLICT (tenant_id) DO NOTHING;
+        </sql>
+        <sql>SELECT public.create_tenant_schema('a1b2c3d4-e5f6-7890-abcd-ef1234567890'::UUID, 'tenant_default');</sql>
+    </changeSet>
+
+</databaseChangeLog>
