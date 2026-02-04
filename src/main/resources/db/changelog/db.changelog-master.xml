@@ -13,5 +13,8 @@
     <include file="db/changelog/changes/006-update-demo-password-to-password123.xml"/>
     <include file="db/changelog/changes/007-add-password-reset-tokens.xml"/>
     <include file="db/changelog/changes/008-add-user-business-fields.xml"/>
+    <include file="db/changelog/changes/009-add-product-business-id.xml"/>
+    <include file="db/changelog/changes/010-create-product-categories.xml"/>
+    <include file="db/changelog/changes/011-seed-product-categories.xml"/>
 
 </databaseChangeLog>

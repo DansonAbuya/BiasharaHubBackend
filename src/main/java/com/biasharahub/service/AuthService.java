@@ -102,8 +102,8 @@ public class AuthService {
                         .findByUserAndVerificationCodeAndExpiresAtAfter(
                                 user, codeStr, Instant.now())
                         .map(code -> {
-                            // One-time verification for customers: turn off future code requirements
-                            if ("customer".equalsIgnoreCase(user.getRole())) {
+                            // One-time verification for customers and staff: after first successful verify, no more codes
+                            if ("customer".equalsIgnoreCase(user.getRole()) || "staff".equalsIgnoreCase(user.getRole()) || "assistant_admin".equalsIgnoreCase(user.getRole())) {
                                 user.setTwoFactorEnabled(false);
                                 userRepository.save(user);
                             }
