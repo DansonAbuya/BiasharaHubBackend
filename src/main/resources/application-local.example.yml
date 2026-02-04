@@ -1,0 +1,14 @@
+# Copy to application-local.yml and fill in your Gmail OAuth values.
+# Run with: spring.profiles.active=dev,local (or set GMAIL_* env vars instead).
+# application-local.yml is gitignored so secrets are not committed.
+
+app:
+  mail:
+    postmark:
+      server-token: "POSTMARK_SERVER_TOKEN_HERE"
+      message-stream: "outbound"   # optional (depends on your Postmark setup)
+    gmail:
+      client-id:    "your-google-client-id.apps.googleusercontent.com"
+      client-secret: "your-google-client-secret"
+      refresh-token: "1//0..."
+    from: "your-gmail@gmail.com"   # Sender address (usually the Gmail that authorized OAuth)

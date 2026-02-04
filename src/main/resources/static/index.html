@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1a5f2a" />
+  <title>BiasharaHub</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/favicon.png" />
+</head>
+<body>
+  <div id="install-banner" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#1a5f2a; color:#fff; padding:12px 16px; box-shadow:0 -2px 10px rgba(0,0,0,0.2); z-index:9999; font-family:sans-serif;">
+    <span>Install BiasharaHub for quick access and offline use.</span>
+    <button id="install-btn" style="margin-left:12px; padding:8px 16px; background:#fff; color:#1a5f2a; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Install</button>
+    <button id="install-dismiss" style="margin-left:8px; padding:6px 12px; background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.6); border-radius:6px; cursor:pointer;">Not now</button>
+  </div>
+  <h1>BiasharaHub</h1>
+  <p>SME commerce platform. Use the frontend app for full experience; this page enables PWA install when served from the same origin.</p>
+  <p><a href="/login.html">Login</a> (password field has show/hide icon)</p>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').then(
+          function (r) { console.log('SW registered', r.scope); },
+          function (e) { console.warn('SW registration failed', e); }
+        );
+      });
+    }
+    (function () {
+      var installBanner = document.getElementById('install-banner');
+      var installBtn = document.getElementById('install-btn');
+      var installDismiss = document.getElementById('install-dismiss');
+      var deferredPrompt = null;
+      if (!installBanner || !installBtn) return;
+      function showBanner() {
+        if (window.matchMedia('(display-mode: standalone)').matches) return;
+        installBanner.style.display = 'block';
+      }
+      function hideBanner() {
+        installBanner.style.display = 'none';
+      }
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        showBanner();
+      });
+      installBtn.addEventListener('click', function () {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function (choice) {
+          if (choice.outcome === 'accepted') hideBanner();
+          deferredPrompt = null;
+        });
+      });
+      installDismiss.addEventListener('click', hideBanner);
+      window.addEventListener('appinstalled', function () {
+        hideBanner();
+        deferredPrompt = null;
+      });
+    })();
+  </script>
+</body>
+</html>

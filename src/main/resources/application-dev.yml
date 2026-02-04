@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    include: local   # loads application-local.yml if present (Gmail OAuth, etc.)
   jpa:
     show-sql: true
     properties:

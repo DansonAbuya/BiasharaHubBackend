@@ -36,6 +36,12 @@ public class User {
     @Builder.Default
     private Boolean twoFactorEnabled = false;
 
+    @Column(name = "business_id")
+    private UUID businessId;
+
+    @Column(name = "business_name")
+    private String businessName;
+
     @Column(name = "created_at")
     private Instant createdAt;
 

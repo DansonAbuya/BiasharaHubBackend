@@ -1,11 +1,12 @@
 package com.biasharahub.controller;
 
-import com.biasharahub.dto.request.AddUserRequest;
+import com.biasharahub.dto.request.AddStaffRequest;
 import com.biasharahub.dto.response.UserDto;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,7 +14,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * User management. Owners can add staff.
+ * User management. Only owners can add staff and list staff.
+ * Staff receive a temporary password by email and must enable 2FA after first login.
  */
 @RestController
 @RequestMapping("/users")
@@ -26,9 +28,9 @@ public class UserController {
     }
 
     @PostMapping("/staff")
+    @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<?> addStaff(@AuthenticationPrincipal AuthenticatedUser user,
-                                      @Valid @RequestBody AddUserRequest request) {
-        if (user == null) return ResponseEntity.status(401).build();
+                                      @Valid @RequestBody AddStaffRequest request) {
         try {
             UserDto staff = userService.addStaff(user, request);
             return ResponseEntity.ok(staff);
@@ -38,8 +40,8 @@ public class UserController {
     }
 
     @GetMapping("/staff")
+    @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<List<UserDto>> listStaff(@AuthenticationPrincipal AuthenticatedUser user) {
-        if (user == null) return ResponseEntity.status(401).build();
         try {
             return ResponseEntity.ok(userService.listStaff(user));
         } catch (IllegalArgumentException e) {

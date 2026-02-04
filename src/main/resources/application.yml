@@ -2,6 +2,19 @@ spring:
   application:
     name: biasharahub-backend
 
+  # Not used for sending: 2FA and transactional email use REST only (Postmark or Gmail API).
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
+
   datasource:
     url: jdbc:postgresql://localhost:5432/biasharahub
     username: ${DB_USERNAME:postgres}
@@ -28,6 +41,12 @@ spring:
 
   cache:
     type: simple
+  # OAuth2 Client (Google for 2FA). Add registration in application-local.yml or set GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET.
+  # When no registration is defined, app starts with email-only 2FA; OAuth2 2FA endpoints return 503.
+  security:
+    oauth2:
+      client:
+        registration: {}
   # Redis (uncomment when available)
   # data:
   #   redis:
@@ -42,7 +61,30 @@ server:
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:biasharahub-super-secret-key-min-256-bits-required-for-hs256}
-  expiration-ms: 86400000  # 24 hours
+  expiration-ms: 3600000   # 1 hour (access token)
+  refresh-expiration-ms: 604800000  # 7 days (refresh token)
+
+# OAuth2 2FA
+app:
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
+  oauth2:
+    backend-base-url: ${OAUTH2_BACKEND_BASE_URL:http://localhost:5050/api}
+    frontend-redirect-uri: ${OAUTH2_FRONTEND_REDIRECT_URI:http://localhost:3000/auth/callback}
+  mail:
+    from: ${MAIL_FROM:no-reply@biasharahub.local}
+    # Postmark (recommended): set POSTMARK_SERVER_TOKEN and MAIL_FROM (and optionally POSTMARK_MESSAGE_STREAM)
+    postmark:
+      server-token: ${POSTMARK_SERVER_TOKEN:}
+      from: ${MAIL_FROM:}
+      message-stream: ${POSTMARK_MESSAGE_STREAM:}
+    # Gmail OAuth: set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, MAIL_FROM
+    # or use application-local.yml (gitignored). No defaults here to avoid committing secrets.
+    gmail:
+      client-id: ${GMAIL_CLIENT_ID:}
+      client-secret: ${GMAIL_CLIENT_SECRET:}
+      refresh-token: ${GMAIL_REFRESH_TOKEN:}
+      from: ${MAIL_FROM:}
+      refresh-interval-ms: 3000000   # 50 min (token ~1h expiry)
 
 # CORS (adjust for production)
 cors:

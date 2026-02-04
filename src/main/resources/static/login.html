@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login – BiasharaHub</title>
+  <link rel="icon" href="/favicon.png" />
+  <style>
+    body { font-family: sans-serif; max-width: 360px; margin: 40px auto; padding: 0 16px; }
+    .field { margin-bottom: 1rem; }
+    label { display: block; margin-bottom: 4px; font-weight: 500; }
+    input[type="email"], input[type="password"], input[type="text"] { width: 100%; padding: 10px 44px 10px 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+    .password-wrap { position: relative; display: block; }
+    .password-wrap input { padding-right: 48px; }
+    .password-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 0; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: #444; z-index: 2; display: flex; align-items: center; justify-content: center; }
+    .password-toggle:hover { color: #1a5f2a; background: #eee; }
+    .password-toggle svg { display: block; width: 22px; height: 22px; flex-shrink: 0; }
+    .password-toggle .icon-show,
+    .password-toggle .icon-hide { display: flex; align-items: center; justify-content: center; }
+    .password-toggle .hidden { display: none !important; }
+    button[type="submit"] { width: 100%; padding: 12px; background: #1a5f2a; color: #fff; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; }
+    button[type="submit"]:hover { background: #144723; }
+    .error { color: #c00; font-size: 14px; margin-top: 8px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <h1>BiasharaHub</h1>
+  <form id="login-form" method="post" action="">
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" required autocomplete="email" />
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <div class="password-wrap">
+        <input id="password" name="password" type="password" required autocomplete="current-password" />
+        <button type="button" class="password-toggle" id="password-toggle" title="Show password" aria-label="Show password">
+          <span class="icon-show" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <span class="icon-hide hidden" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </span>
+        </button>
+      </div>
+    </div>
+    <div class="field">
+      <button type="submit">Sign in</button>
+    </div>
+    <div id="error" class="error hidden"></div>
+  </form>
+  <script>
+    (function () {
+      var input = document.getElementById('password');
+      var toggle = document.getElementById('password-toggle');
+      var iconShow = toggle.querySelector('.icon-show');
+      var iconHide = toggle.querySelector('.icon-hide');
+      if (!iconShow || !iconHide) return;
+      toggle.addEventListener('click', function () {
+        if (input.type === 'password') {
+          input.type = 'text';
+          toggle.title = 'Hide password';
+          toggle.setAttribute('aria-label', 'Hide password');
+          iconShow.classList.add('hidden');
+          iconHide.classList.remove('hidden');
+        } else {
+          input.type = 'password';
+          toggle.title = 'Show password';
+          toggle.setAttribute('aria-label', 'Show password');
+          iconShow.classList.remove('hidden');
+          iconHide.classList.add('hidden');
+        }
+      });
+      document.getElementById('login-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var errEl = document.getElementById('error');
+        errEl.classList.add('hidden');
+        fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value
+          })
+        }).then(function (r) {
+          if (r.ok) return r.json();
+          throw new Error(r.status === 401 ? 'Invalid email or password' : 'Login failed');
+        }).then(function (data) {
+          if (data.token) {
+            window.location.href = '/';
+          } else if (data.requiresTwoFactor) {
+            window.location.href = '/verify.html?state=' + encodeURIComponent(data.stateToken || '');
+          }
+        }).catch(function (err) {
+          errEl.textContent = err.message || 'Login failed';
+          errEl.classList.remove('hidden');
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
