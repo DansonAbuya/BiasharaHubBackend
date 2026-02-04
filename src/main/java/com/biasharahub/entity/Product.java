@@ -44,6 +44,9 @@ public class Product {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Column(name = "business_id")
+    private UUID businessId;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InventoryImage> images = new ArrayList<>();
