@@ -15,3 +15,12 @@ target/
 *.ipr
 *.iws
 .DS_Store
+
+# Local config with secrets (Gmail OAuth, etc.)
+application-local.yml
+src/main/resources/application-local.yml
+
+# Local env files with secrets (Postmark, etc.)
+.env
+.env.*
+!.env*.example

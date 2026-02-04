@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="005-disable-2fa-default-users" author="biasharahub">
+        <comment>Ensure default demo users never have 2FA enabled</comment>
+        <sql>
+            UPDATE tenant_default.users
+            SET two_factor_enabled = false
+            WHERE user_id IN (
+                '11111111-1111-1111-1111-111111111100'::UUID,
+                '11111111-1111-1111-1111-111111111101'::UUID,
+                '11111111-1111-1111-1111-111111111102'::UUID,
+                '11111111-1111-1111-1111-111111111103'::UUID
+            );
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

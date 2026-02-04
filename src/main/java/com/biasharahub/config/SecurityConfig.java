@@ -37,7 +37,10 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**", "/public/**", "/static/**", "/favicon.ico", "/favicon.png", "/logo.png", "/error",
+                        .requestMatchers("/auth/2fa/oauth/authorize", "/auth/oauth2/callback",
+                                "/api/auth/2fa/oauth/authorize", "/api/auth/oauth2/callback").permitAll()
+                        .requestMatchers("/auth/2fa/**", "/api/auth/2fa/**", "/auth/change-password", "/api/auth/change-password").authenticated()
+                        .requestMatchers("/auth/**", "/api/auth/**", "/public/**", "/static/**", "/favicon.ico", "/favicon.png", "/logo.png", "/error",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()
                         .anyRequest().authenticated())
@@ -48,10 +51,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000", "http://127.0.0.1:3000"));
+        config.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "https://localhost:3000",
+                "https://127.0.0.1:3000"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

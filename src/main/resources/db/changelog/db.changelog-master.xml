@@ -9,5 +9,9 @@
     <include file="db/changelog/changes/002-create-tenant-schema-function.xml"/>
     <include file="db/changelog/changes/003-insert-default-tenant.xml"/>
     <include file="db/changelog/changes/004-seed-demo-users.xml"/>
+    <include file="db/changelog/changes/005-disable-2fa-default-users.xml"/>
+    <include file="db/changelog/changes/006-update-demo-password-to-password123.xml"/>
+    <include file="db/changelog/changes/007-add-password-reset-tokens.xml"/>
+    <include file="db/changelog/changes/008-add-user-business-fields.xml"/>
 
 </databaseChangeLog>
