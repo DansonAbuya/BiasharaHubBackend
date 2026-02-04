@@ -92,7 +92,7 @@ public class MailService {
 
                 Your temporary password is: %s
 
-                Please log in and change your password. Two-factor authentication (2FA) is always on for staff accounts.
+                On your first login you will receive a verification code by email; enter it to complete sign-in. After that, you can log in with just your email and password. We recommend changing your password after first login.
 
                 If you did not expect this email, please contact your business owner.
                 """.formatted(name, businessLine, temporaryPassword);

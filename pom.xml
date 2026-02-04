@@ -109,6 +109,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- AWS S3 SDK (S3-compatible API for Cloudflare R2) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.25.11</version>
+        </dependency>
+
         <!-- Swagger / OpenAPI Documentation (2.5.x for Spring Boot 3.2 / Spring 6.1) -->
         <dependency>
             <groupId>org.springdoc</groupId>

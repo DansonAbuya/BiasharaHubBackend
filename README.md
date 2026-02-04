@@ -87,13 +87,35 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
 | POST | `/admin/assistant-admins` | Add assistant admin (super_admin only; body: name, email) |
 | POST | `/users/staff` | Add staff (owner only; body: name, email) |
 | GET | `/users/staff` | List staff (owner only) |
-| GET | `/products` | List products |
+| GET | `/products/categories` | List product categories for frontend dropdown (no auth) |
+| GET | `/products/businesses` | List businesses/owners for customer filter dropdown (no auth) |
+| GET | `/products` | List products (owner/staff: only their business; customers: all, optional filters). **Customer filters:** `category`, `businessId`, `businessName`, `ownerId` (no auth for GET) |
+| GET | `/products/{id}` | Get product (owner/staff: only their business) |
+| POST | `/products` | Create product (owner/staff; scoped to their business) |
+| PUT | `/products/{id}` | Update product (owner/staff; only their business) |
+| DELETE | `/products/{id}` | Delete product (owner/staff; only their business) |
+| POST | `/products/upload-image` | Upload product image to R2 (owner/staff; body: multipart `file`) |
 | GET | `/orders` | List orders (auth required) |
 | GET | `/shipments` | List shipments (auth required) |
 | GET | `/analytics` | Dashboard analytics (owner/staff) |
 | GET | `/public/tenants/{id}/branding` | Tenant branding (logo, colors) |
 
 **Auth:** Access token expires in **1 hour**. Use the `refreshToken` from login/register and `POST /auth/refresh` with body `{"refreshToken":"<refreshToken>"}` to get a new `token` and `refreshToken` without re-login.
+
+### Product images (Cloudflare R2)
+
+Product images are stored in **Cloudflare R2** (S3-compatible). To enable uploads, set:
+
+| Variable | Description |
+|----------|-------------|
+| `R2_ENABLED` | `true` to enable R2 |
+| `R2_BUCKET` | Bucket name (default `biasharahub-products`) |
+| `R2_ENDPOINT` | R2 endpoint, e.g. `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
+| `R2_ACCESS_KEY_ID` | R2 Access Key ID |
+| `R2_SECRET_ACCESS_KEY` | R2 Secret Access Key |
+| `R2_PUBLIC_URL` | Public URL base for images (e.g. R2 public bucket URL or custom domain) |
+
+Flow: upload image with `POST /products/upload-image` (multipart `file`), use the returned `url` in the product's `images` array when creating or updating a product.
 
 ## Two-Factor Authentication (2FA) via OAuth 2.0
 

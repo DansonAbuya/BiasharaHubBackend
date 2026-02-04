@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="011-seed-product-categories" author="biasharahub">
+        <comment>Ensure product categories are seeded for tenant_default (idempotent)</comment>
+        <sql><![CDATA[
+            INSERT INTO tenant_default.product_categories (category_id, name, display_order) VALUES
+                (gen_random_uuid(), 'Electronics', 1),
+                (gen_random_uuid(), 'Clothing & Apparel', 2),
+                (gen_random_uuid(), 'Food & Beverages', 3),
+                (gen_random_uuid(), 'Home & Garden', 4),
+                (gen_random_uuid(), 'Health & Beauty', 5),
+                (gen_random_uuid(), 'Sports & Outdoors', 6),
+                (gen_random_uuid(), 'Books & Stationery', 7),
+                (gen_random_uuid(), 'Toys & Games', 8),
+                (gen_random_uuid(), 'Automotive', 9),
+                (gen_random_uuid(), 'Other', 99)
+            ON CONFLICT (name) DO NOTHING;
+        ]]></sql>
+    </changeSet>
+
+</databaseChangeLog>
