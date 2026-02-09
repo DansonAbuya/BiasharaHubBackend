@@ -59,10 +59,29 @@ spring:
   #     host: ${REDIS_HOST:localhost}
   #     port: ${REDIS_PORT:6379}
 
+  # Kafka (used only when app.kafka.enabled=true; see KafkaConfig)
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:biasharahub}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.biasharahub.messaging
+    listener:
+      missing-topics-fatal: false
+
 server:
   port: ${SERVER_PORT:5050}
   servlet:
     context-path: /api
+  # Use HTTP only (no SSL) for local dev so you can access via http://localhost
+  ssl:
+    enabled: false
 
 # JWT Configuration
 jwt:
@@ -92,19 +111,63 @@ app:
       from: ${MAIL_FROM:}
       refresh-interval-ms: 3000000   # 50 min (token ~1h expiry)
 
-# CORS (adjust for production)
-cors:
-  allowed-origins: http://localhost:3000,http://127.0.0.1:3000
+  # CORS (adjust for production)
+  cors:
+    allowed-origins: http://localhost:3000,http://127.0.0.1:3000
 
-# Cloudflare R2 (S3-compatible) for product images
+  # Kafka (event publishing for orders/payments). Set KAFKA_ENABLED=true and KAFKA_BOOTSTRAP_SERVERS to use.
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    topics:
+      order-created: ${KAFKA_TOPIC_ORDER_CREATED:orders.created}
+      payment-completed: ${KAFKA_TOPIC_PAYMENT_COMPLETED:payments.completed}
+
+  # In-process async (no broker): run order/payment handlers in a background thread. Default true when not using Kafka.
+  messaging:
+    in-process:
+      enabled: ${MESSAGING_IN_PROCESS_ENABLED:true}
+
+  # Wallet / payouts
+  wallet:
+    # Platform commission share on incoming payments (0.1 = 10%)
+    platform-commission-rate: ${PLATFORM_COMMISSION_RATE:0.1}
+
+  # M-Pesa (Daraja) configuration for payments and payouts
+  # All values (shortcode, passkey, consumer-key, consumer-secret) must come from your app at https://developer.safaricom.co.ke
+  # "Merchant does not exist" (500.001.1001) = shortcode/credentials not valid for this app; use the ones from the Daraja portal.
+  # Callback URLs must be HTTPS and publicly reachable; for local dev use a tunnel (e.g. ngrok).
+  mpesa:
+    enabled: ${MPESA_ENABLED:false}
+    environment: ${MPESA_ENV:sandbox}          # sandbox or production
+    base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
+    shortcode: ${MPESA_SHORTCODE:}       # use your sandbox Lipa Na M-Pesa Online shortcode from Daraja portal (often 174379)
+    passkey: ${MPESA_PASSKEY:}                 # from Daraja app "Lipa Na M-Pesa Online" > Test credentials
+    consumer-key: ${MPESA_CONSUMER_KEY:}       # from your Daraja app
+    consumer-secret: ${MPESA_CONSUMER_SECRET:} # from your Daraja app
+    stk-callback-url: ${MPESA_STK_CALLBACK_URL:}
+    b2c-callback-url: ${MPESA_B2C_CALLBACK_URL:}
+    payout-product-name: ${MPESA_PAYOUT_PRODUCT_NAME:testapi}
+    timeout: ${MPESA_TIMEOUT_MS:10000}
+
+  # (R2 for product/verification uploads is at top-level "r2:" so R2Config can bind it)
+
+
+# Cloudflare R2 (S3-compatible) for product images and verification documents
+# Must be top-level "r2:" for R2Config prefix to work.
 r2:
-  enabled: ${R2_ENABLED:true}
+  enabled: ${R2_ENABLED:false}
   bucket: ${R2_BUCKET:}
   endpoint: ${R2_ENDPOINT:}
   access-key-id: ${R2_ACCESS_KEY_ID:}
   secret-access-key: ${R2_SECRET_ACCESS_KEY:}
-  # Public URL base for serving images (e.g. https://pub-xxx.r2.dev or custom domain)
   public-url: ${R2_PUBLIC_URL:}
+
+
+# At-rest encryption for sensitive financial fields
+encryption:
+  secret: ${ENCRYPTION_SECRET:please-change-me-32-bytes-min}
+
 
 # Swagger / OpenAPI (SpringDoc)
 springdoc:

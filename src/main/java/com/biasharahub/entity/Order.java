@@ -1,5 +1,6 @@
 package com.biasharahub.entity;
 
+import com.biasharahub.config.EncryptedStringAttributeConverter;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -37,6 +38,7 @@ public class Order {
     @Builder.Default
     private String orderStatus = "pending";
 
+    @Convert(converter = EncryptedStringAttributeConverter.class)
     @Column(name = "shipping_address", columnDefinition = "TEXT")
     private String shippingAddress;
 
@@ -45,6 +47,12 @@ public class Order {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @Column(name = "delivered_at")
+    private Instant deliveredAt;
+
+    @Column(name = "payout_released_at")
+    private Instant payoutReleasedAt;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

@@ -7,13 +7,14 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-/** Business / owner info for customer filter dropdown. */
+/** Shop (business) info for marketplace; includes seller tier for categorisation. */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class BusinessDto {
-    private UUID id;           // businessId
-    private String name;       // business name
+    private UUID id;           // businessId (shop id)
+    private String name;       // shop/business name
     private String ownerName;  // owner display name
+    private String sellerTier; // tier1, tier2, tier3 for grouping (Informal, Registered SME, Corporate)
 }

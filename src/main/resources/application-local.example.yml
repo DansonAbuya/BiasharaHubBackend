@@ -1,6 +1,15 @@
-# Copy to application-local.yml and fill in your Gmail OAuth values.
-# Run with: spring.profiles.active=dev,local (or set GMAIL_* env vars instead).
+# Copy to application-local.yml and fill in your values.
+# Run with: spring.profiles.active=dev,local (or set env vars instead).
 # application-local.yml is gitignored so secrets are not committed.
+
+# Encryption at rest (user name, shipping address, payment transaction ID, payout details).
+# Use a 32-byte (or longer) secret; set ENCRYPTION_SECRET in production.
+# encryption:
+#   secret: "your-32-byte-minimum-secret-here"
+
+# Optional: M-Pesa STK Push callback must be HTTPS and publicly reachable.
+# For local dev, run: ngrok http 5050  (or similar), then set in env or here:
+#   MPESA_STK_CALLBACK_URL=https://YOUR-NGROK-URL.ngrok.io/api/payments/mpesa/stk-callback
 
 app:
   mail:

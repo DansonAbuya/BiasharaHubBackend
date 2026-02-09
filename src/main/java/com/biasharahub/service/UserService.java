@@ -40,6 +40,10 @@ public class UserService {
         if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
             throw new IllegalArgumentException("Email already registered");
         }
+        String t = request.getApplyingForTier() != null ? request.getApplyingForTier().trim().toLowerCase() : "";
+        if (!"tier1".equals(t) && !"tier2".equals(t) && !"tier3".equals(t)) {
+            throw new IllegalArgumentException("Applying for tier is required and must be tier1, tier2, or tier3");
+        }
         String tempPassword = generateTemporaryPassword();
         User owner = User.builder()
                 .email(request.getEmail().toLowerCase())
@@ -48,6 +52,7 @@ public class UserService {
                 .role("owner")
                 .twoFactorEnabled(false)
                 .businessName(request.getBusinessName() != null ? request.getBusinessName().trim() : null)
+                .applyingForTier(t)
                 .build();
         owner = userRepository.save(owner);
         owner.setBusinessId(owner.getUserId());
@@ -141,6 +146,12 @@ public class UserService {
                 .role(user.getRole())
                 .businessId(user.getBusinessId() != null ? user.getBusinessId().toString() : null)
                 .businessName(user.getBusinessName())
+                .verificationStatus(user.getVerificationStatus())
+                .verifiedAt(user.getVerifiedAt())
+                .verifiedByUserId(user.getVerifiedByUserId())
+                .verificationNotes(user.getVerificationNotes())
+                .sellerTier(user.getSellerTier())
+                .applyingForTier(user.getApplyingForTier())
                 .build();
     }
 }

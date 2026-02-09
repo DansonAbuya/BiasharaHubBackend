@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="016-encryption-column-sizes" author="biasharahub">
+        <comment>Widen columns for encrypted values: users.name, payments.transaction_id to TEXT</comment>
+        <sql>
+            ALTER TABLE tenant_default.users ALTER COLUMN name TYPE TEXT;
+            ALTER TABLE tenant_default.payments ALTER COLUMN transaction_id TYPE TEXT;
+        </sql>
+    </changeSet>
+
+    <changeSet id="016-password-reset-token-hash" author="biasharahub">
+        <comment>Add token_hash to password_reset_tokens; store hash instead of plain token for new resets</comment>
+        <sql>
+            ALTER TABLE tenant_default.password_reset_tokens ADD COLUMN IF NOT EXISTS token_hash VARCHAR(64);
+            ALTER TABLE tenant_default.password_reset_tokens ALTER COLUMN token DROP NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON tenant_default.password_reset_tokens(token_hash) WHERE token_hash IS NOT NULL;
+            UPDATE tenant_default.password_reset_tokens SET token_hash = encode(sha256(convert_to(token, 'UTF8')), 'hex') WHERE token IS NOT NULL AND token_hash IS NULL;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

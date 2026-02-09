@@ -23,4 +23,5 @@ public class ProductDto {
     private String image;
     private List<String> images;
     private String businessId;
+    private String moderationStatus;
 }

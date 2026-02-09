@@ -16,5 +16,10 @@
     <include file="db/changelog/changes/009-add-product-business-id.xml"/>
     <include file="db/changelog/changes/010-create-product-categories.xml"/>
     <include file="db/changelog/changes/011-seed-product-categories.xml"/>
+    <include file="db/changelog/changes/012-create-tenant-wallet-ledger.xml"/>
+    <include file="db/changelog/changes/013-verification-moderation-trust.xml"/>
+    <include file="db/changelog/changes/014-seller-tiers.xml"/>
+    <include file="db/changelog/changes/015-add-applying-for-tier.xml"/>
+    <include file="db/changelog/changes/016-encryption-and-token-hash.xml"/>
 
 </databaseChangeLog>
