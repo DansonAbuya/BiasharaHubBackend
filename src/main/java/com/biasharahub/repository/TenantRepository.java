@@ -12,4 +12,7 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
 
     @Query("SELECT t.schemaName FROM Tenant t WHERE t.tenantId = :tenantId AND t.isActive = true")
     Optional<String> findSchemaByTenantId(@Param("tenantId") UUID tenantId);
+
+    Optional<Tenant> findBySchemaName(String schemaName);
 }
+

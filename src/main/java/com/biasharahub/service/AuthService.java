@@ -22,7 +22,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -153,6 +157,9 @@ public class AuthService {
                 .role(user.getRole())
                 .businessId(user.getBusinessId() != null ? user.getBusinessId().toString() : null)
                 .businessName(user.getBusinessName())
+                .verificationStatus(user.getVerificationStatus())
+                .sellerTier(user.getSellerTier())
+                .applyingForTier(user.getApplyingForTier())
                 .build();
     }
 
@@ -219,7 +226,7 @@ public class AuthService {
             Instant expiresAt = Instant.now().plusSeconds(3600); // 1 hour
             PasswordResetToken resetToken = PasswordResetToken.builder()
                     .user(user)
-                    .token(token)
+                    .tokenHash(sha256Hex(token))
                     .expiresAt(expiresAt)
                     .build();
             passwordResetTokenRepository.save(resetToken);
@@ -233,7 +240,10 @@ public class AuthService {
      */
     @Transactional
     public boolean resetPassword(String token, String newPassword) {
-        return passwordResetTokenRepository.findByTokenAndExpiresAtAfter(token, Instant.now())
+        String tokenHash = sha256Hex(token);
+        Optional<PasswordResetToken> resetTokenOpt = passwordResetTokenRepository.findByTokenHashAndExpiresAtAfter(tokenHash, Instant.now())
+                .or(() -> passwordResetTokenRepository.findByTokenAndExpiresAtAfter(token, Instant.now()));
+        return resetTokenOpt
                 .map(resetToken -> {
                     User user = resetToken.getUser();
                     user.setPasswordHash(passwordEncoder.encode(newPassword));
@@ -242,5 +252,15 @@ public class AuthService {
                     return true;
                 })
                 .orElse(false);
+    }
+
+    private static String sha256Hex(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 }

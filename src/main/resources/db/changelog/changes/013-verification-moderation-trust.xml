@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="013-add-owner-verification-fields" author="biasharahub">
+        <comment>Owner/business verification: status, verified_at, verified_by, notes</comment>
+        <sql>
+            ALTER TABLE tenant_default.users ADD COLUMN IF NOT EXISTS verification_status VARCHAR(32) DEFAULT 'pending';
+            ALTER TABLE tenant_default.users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE tenant_default.users ADD COLUMN IF NOT EXISTS verified_by_user_id UUID;
+            ALTER TABLE tenant_default.users ADD COLUMN IF NOT EXISTS verification_notes TEXT;
+        </sql>
+    </changeSet>
+
+    <changeSet id="013-add-product-moderation-fields" author="biasharahub">
+        <comment>Product moderation: status, moderated_at, moderated_by, notes</comment>
+        <sql>
+            ALTER TABLE tenant_default.products ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(32) DEFAULT 'approved';
+            ALTER TABLE tenant_default.products ADD COLUMN IF NOT EXISTS moderated_at TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE tenant_default.products ADD COLUMN IF NOT EXISTS moderated_by_user_id UUID;
+            ALTER TABLE tenant_default.products ADD COLUMN IF NOT EXISTS moderation_notes TEXT;
+        </sql>
+    </changeSet>
+
+    <changeSet id="013-add-order-delivered-payout-fields" author="biasharahub">
+        <comment>Order: delivered_at and payout_released_at for escrow/dispute window</comment>
+        <sql>
+            ALTER TABLE tenant_default.orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE tenant_default.orders ADD COLUMN IF NOT EXISTS payout_released_at TIMESTAMP WITH TIME ZONE;
+        </sql>
+    </changeSet>
+
+    <changeSet id="013-create-owner-verification-documents" author="biasharahub">
+        <comment>Documents uploaded by owners for verification (business reg, ID, etc.)</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS tenant_default.owner_verification_documents (
+                document_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL REFERENCES tenant_default.users(user_id) ON DELETE CASCADE,
+                document_type VARCHAR(64) NOT NULL,
+                file_url VARCHAR(500) NOT NULL,
+                uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_owner_verification_docs_user ON tenant_default.owner_verification_documents(user_id);
+        </sql>
+    </changeSet>
+
+    <changeSet id="013-create-reports" author="biasharahub">
+        <comment>Customer/order reports: product, order, or business</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS tenant_default.reports (
+                report_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                reporter_user_id UUID NOT NULL REFERENCES tenant_default.users(user_id) ON DELETE CASCADE,
+                target_type VARCHAR(32) NOT NULL,
+                target_id UUID NOT NULL,
+                reason VARCHAR(64),
+                description TEXT,
+                status VARCHAR(32) NOT NULL DEFAULT 'open',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP WITH TIME ZONE,
+                resolved_by_user_id UUID REFERENCES tenant_default.users(user_id),
+                resolution_notes TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_reports_status ON tenant_default.reports(status);
+            CREATE INDEX IF NOT EXISTS idx_reports_target ON tenant_default.reports(target_type, target_id);
+        </sql>
+    </changeSet>
+
+    <changeSet id="013-create-order-reviews" author="biasharahub">
+        <comment>Customer reviews for orders/businesses</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS tenant_default.order_reviews (
+                review_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                order_id UUID NOT NULL REFERENCES tenant_default.orders(order_id) ON DELETE CASCADE,
+                reviewer_user_id UUID NOT NULL REFERENCES tenant_default.users(user_id) ON DELETE CASCADE,
+                rating INTEGER NOT NULL CHECK (rating >= 1 AND rating &lt;= 5),
+                comment TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(order_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_order_reviews_order ON tenant_default.order_reviews(order_id);
+        </sql>
+    </changeSet>
+
+    <changeSet id="013-backfill-existing-owners-verified" author="biasharahub">
+        <comment>Treat existing owners as verified so storefront keeps showing their products</comment>
+        <sql>
+            UPDATE tenant_default.users SET verification_status = 'verified' WHERE role = 'owner' AND (verification_status IS NULL OR verification_status = 'pending');
+        </sql>
+    </changeSet>
+</databaseChangeLog>

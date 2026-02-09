@@ -19,4 +19,8 @@ public class AddOwnerRequest {
 
     @NotBlank(message = "Business name is required")
     private String businessName;
+
+    /** Required: tier the business is applying for (tier1, tier2, tier3). Determines which documents they must submit. */
+    @NotBlank(message = "Applying for tier is required (tier1, tier2, or tier3)")
+    private String applyingForTier;
 }

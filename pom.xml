@@ -109,6 +109,12 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Kafka (optional: set app.kafka.enabled=true to use) -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
         <!-- AWS S3 SDK (S3-compatible API for Cloudflare R2) -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>

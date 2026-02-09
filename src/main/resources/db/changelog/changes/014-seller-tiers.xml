@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="014-add-seller-tier" author="biasharahub">
+        <comment>Add seller_tier to users to support 3 seller tiers</comment>
+        <sql>
+            ALTER TABLE tenant_default.users ADD COLUMN IF NOT EXISTS seller_tier VARCHAR(32) DEFAULT 'tier1';
+            UPDATE tenant_default.users SET seller_tier = 'tier1' WHERE seller_tier IS NULL AND role = 'owner';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
+

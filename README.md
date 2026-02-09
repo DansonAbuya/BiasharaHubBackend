@@ -2,6 +2,8 @@
 
 Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
 
+**This repository is backend-only.** The frontend lives in a separate project (e.g. **BisharaHubFrontend**) and must run on its own. The two interact **only via HTTP API calls**: frontend at `http://localhost:3000` (or your dev URL) calls this API at `http://localhost:5050/api`. CORS is configured to allow the frontend origin.
+
 ## Tech Stack
 
 - **Java 17** / **Spring Boot 3.2**
@@ -95,7 +97,12 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
 | PUT | `/products/{id}` | Update product (owner/staff; only their business) |
 | DELETE | `/products/{id}` | Delete product (owner/staff; only their business) |
 | POST | `/products/upload-image` | Upload product image to R2 (owner/staff; body: multipart `file`) |
-| GET | `/orders` | List orders (auth required) |
+| GET | `/orders` | List orders (customer: own orders; owner/staff: orders containing their business products) |
+| GET | `/orders/{id}` | Get order (auth; customer or owner/staff with access) |
+| POST | `/orders` | Create order (auth; body: `CreateOrderRequest` with `items` and optional `shippingAddress`). Validates stock; deducts inventory; creates pending payment. |
+| PATCH | `/orders/{id}/status` | Update order status (owner/staff; query `status`) |
+| POST | `/orders/{orderId}/payments/initiate` | Initiate payment for order (M-PESA stub; auth) |
+| PATCH | `/orders/{orderId}/payments/{paymentId}/confirm` | Confirm payment (stub for M-PESA callback; auth) |
 | GET | `/shipments` | List shipments (auth required) |
 | GET | `/analytics` | Dashboard analytics (owner/staff) |
 | GET | `/public/tenants/{id}/branding` | Tenant branding (logo, colors) |
@@ -116,6 +123,42 @@ Product images are stored in **Cloudflare R2** (S3-compatible). To enable upload
 | `R2_PUBLIC_URL` | Public URL base for images (e.g. R2 public bucket URL or custom domain) |
 
 Flow: upload image with `POST /products/upload-image` (multipart `file`), use the returned `url` in the product's `images` array when creating or updating a product.
+
+### M-Pesa (Daraja) STK Push
+
+Payments use **M-Pesa STK Push**. You must use **your own** app credentials from the [Daraja portal](https://developer.safaricom.co.ke): create an app, add **Lipa Na M-Pesa Online** as a product, and use the **shortcode**, **passkey**, **consumer key**, and **consumer secret** from that app. The error **"Merchant does not exist" (500.001.1001)** means the shortcode or credentials are wrong or not from your Daraja app—replace them with the values from the portal.
+
+The **callback URL** (where Safaricom sends the payment result) must be:
+
+- **HTTPS** (not `http://`)
+- **Publicly reachable** (Safaricom’s servers must be able to POST to it; `localhost` is not valid)
+
+**Local development:** Expose your backend with a tunnel, then set the callback URL to that public HTTPS URL.
+
+1. Start a tunnel, e.g. **ngrok**: `ngrok http 5050`
+2. Copy the HTTPS URL (e.g. `https://abc123.ngrok-free.app`)
+3. Set the callback URL when starting the app:
+   - **Windows (PowerShell):** `$env:MPESA_STK_CALLBACK_URL="https://abc123.ngrok-free.app/api/payments/mpesa/stk-callback"`
+   - **Linux/macOS:** `export MPESA_STK_CALLBACK_URL="https://abc123.ngrok-free.app/api/payments/mpesa/stk-callback"`
+4. Or put the same value in `application-local.yml` under `app.mpesa.stk-callback-url`.
+
+If the callback is not reachable (e.g. you skip the tunnel), the STK push may still be sent to the phone; the user can complete payment and the app’s **“I’ve paid”** button can be used to confirm via `PATCH /orders/{id}/payments/{paymentId}/confirm`.
+
+### Kafka (order / payment events)
+
+Order and payment events can be published to **Kafka** for async processing (notifications, shipments, analytics). Kafka is **off by default** so the app starts without a broker.
+
+| Variable | Description |
+|----------|-------------|
+| `KAFKA_ENABLED` | `true` to enable Kafka (default `false`) |
+| `KAFKA_BOOTSTRAP_SERVERS` | Broker list, e.g. `localhost:9092` |
+| `KAFKA_TOPIC_ORDER_CREATED` | Topic for order created (default `orders.created`) |
+| `KAFKA_TOPIC_PAYMENT_COMPLETED` | Topic for payment completed (default `payments.completed`) |
+| `KAFKA_CONSUMER_GROUP` | Consumer group for listeners (default `biasharahub`) |
+
+When enabled, the app publishes to Kafka when an order is created and when a payment is confirmed. Example consumers log events; see `OrderEventKafkaListener` and `docs/MESSAGING.md`.
+
+**Without Kafka:** Set `MESSAGING_IN_PROCESS_ENABLED=true` to run order/payment handlers in a background thread (no broker). See `docs/MESSAGING.md` for in-process async, DB outbox, and other options.
 
 ## Two-Factor Authentication (2FA) via OAuth 2.0
 
@@ -230,16 +273,9 @@ Use password **`password123`** for all demo accounts. (Omit `X-Tenant-ID` or use
 | staff@biashara.com | password123 | staff |
 | customer@biashara.com | password123 | customer |
 
-## PWA (Progressive Web App)
+## Static assets (API-only)
 
-The backend serves PWA assets so the app can be **installable** and **optionally work offline** when the frontend is served from the same origin (or when using the static root page).
-
-- **`/manifest.json`** – Web App Manifest (name, icons, theme, `display: standalone`).
-- **`/sw.js`** – Service worker: caches static assets (HTML, JS, CSS, images) for offline use; never caches `/api/*` or non-GET requests.
-- **`/`** – Root `index.html` links the manifest and registers the service worker.
-
-**Using with a separate Next.js frontend:**  
-If the frontend runs on another origin, copy `manifest.json` and `sw.js` into the frontend (e.g. `public/manifest.json`, `public/sw.js`), link the manifest in your root layout (`<link rel="manifest" href="/manifest.json" />`), and register the service worker from a client component after load (`navigator.serviceWorker.register('/sw.js')`). Adjust `start_url` and icon paths in the manifest to match the frontend.
+The backend serves only minimal static assets used by the API (e.g. tenant branding): **`/static/logo.png`**, **`/static/favicon.png`**. No frontend app or PWA is served from this repo; the frontend is a separate application that calls this API.
 
 ## Migrations (Liquibase)
 

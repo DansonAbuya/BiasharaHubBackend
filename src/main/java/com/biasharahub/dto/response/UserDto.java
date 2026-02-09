@@ -18,4 +18,11 @@ public class UserDto {
     private String role;
     private String businessId;
     private String businessName;
+    private String verificationStatus;
+    private java.time.Instant verifiedAt;
+    private UUID verifiedByUserId;
+    private String verificationNotes;
+    private String sellerTier;
+    /** Optional: tier the owner is applying for (tier1/tier2/tier3). Set at onboarding. */
+    private String applyingForTier;
 }

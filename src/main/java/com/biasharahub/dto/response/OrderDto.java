@@ -26,7 +26,10 @@ public class OrderDto {
     private String status;
     private String paymentStatus;
     private String paymentMethod;
+    private UUID paymentId; // first pending payment, for client to confirm
     private Instant createdAt;
     private Instant updatedAt;
     private String shippingAddress;
+    private Instant deliveredAt;
+    private Instant payoutReleasedAt;
 }
