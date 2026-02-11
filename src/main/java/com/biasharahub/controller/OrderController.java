@@ -113,12 +113,17 @@ public class OrderController {
 
         String orderNumber = "ORD-" + System.currentTimeMillis();
         BigDecimal total = BigDecimal.ZERO;
+
+        String deliveryMode = request.getDeliveryMode() != null ? request.getDeliveryMode() : "SELLER_SELF";
+        BigDecimal shippingFee = request.getShippingFee() != null ? request.getShippingFee() : BigDecimal.ZERO;
         Order order = Order.builder()
                 .user(orderOwner)
                 .orderNumber(orderNumber)
                 .totalAmount(BigDecimal.ZERO)
                 .orderStatus("pending")
                 .shippingAddress(request.getShippingAddress())
+                .deliveryMode(deliveryMode)
+                .shippingFee(shippingFee)
                 .build();
         for (CreateOrderRequest.OrderItemRequest item : request.getItems()) {
             Product product = productRepository.findById(item.getProductId()).orElseThrow();
@@ -138,6 +143,8 @@ public class OrderController {
             product.setQuantity(product.getQuantity() - qty);
             productRepository.save(product);
         }
+        // Include shipping fee in total
+        total = total.add(shippingFee);
         order.setTotalAmount(total);
         order = orderRepository.save(order);
 
@@ -175,6 +182,53 @@ public class OrderController {
                     return ResponseEntity.ok(toDto(o));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Allow a user to cancel an order as long as it has not been confirmed yet.
+     * - Only pending orders can be cancelled.
+     * - Only the customer (or staff/owner acting on behalf) can cancel orders they can access.
+     * - Pending payments are marked as cancelled and inventory is restored.
+     */
+    @PatchMapping("/{id}/cancel")
+    @Transactional
+    public ResponseEntity<OrderDto> cancelOrder(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id) {
+        if (user == null) return ResponseEntity.status(401).<OrderDto>build();
+        User currentUser = userRepository.findById(user.userId()).orElse(null);
+        if (currentUser == null) return ResponseEntity.status(401).<OrderDto>build();
+
+        return orderRepository.findById(id)
+                .filter(o -> canAccess(o, currentUser))
+                .map(o -> {
+                    if (!"pending".equalsIgnoreCase(o.getOrderStatus())) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).<OrderDto>build();
+                    }
+
+                    // Restore inventory for all items
+                    for (OrderItem oi : o.getItems()) {
+                        Product product = oi.getProduct();
+                        if (product != null) {
+                            Integer currentQty = product.getQuantity() != null ? product.getQuantity() : 0;
+                            product.setQuantity(currentQty + oi.getQuantity());
+                            productRepository.save(product);
+                        }
+                    }
+
+                    // Mark any pending payments as cancelled
+                    for (Payment p : o.getPayments()) {
+                        if ("pending".equalsIgnoreCase(p.getPaymentStatus())) {
+                            p.setPaymentStatus("cancelled");
+                            paymentRepository.save(p);
+                        }
+                    }
+
+                    o.setOrderStatus("cancelled");
+                    orderRepository.save(o);
+                    return ResponseEntity.ok(toDto(o));
+                })
+                .orElse(ResponseEntity.status(404).<OrderDto>build());
     }
 
     private boolean canAccess(Order o, User currentUser) {
@@ -219,6 +273,8 @@ public class OrderController {
                 .paymentStatus(paymentStatus)
                 .paymentMethod(paymentMethod)
                 .paymentId(paymentId)
+                .deliveryMode(o.getDeliveryMode())
+                .shippingFee(o.getShippingFee())
                 .createdAt(o.getOrderedAt())
                 .updatedAt(o.getUpdatedAt())
                 .shippingAddress(o.getShippingAddress())

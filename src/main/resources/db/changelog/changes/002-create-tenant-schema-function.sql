@@ -11,16 +11,46 @@ BEGIN
         v_schema := LEFT(v_schema, 63);
     END IF;
     EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I', v_schema);
-    EXECUTE format('CREATE TABLE IF NOT EXISTS %I.users (user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR(255) NOT NULL, password_hash VARCHAR(255) NOT NULL, name TEXT, role VARCHAR(50) NOT NULL DEFAULT ''customer'' CHECK (role IN (''super_admin'', ''owner'', ''staff'', ''customer'')), two_factor_enabled BOOLEAN DEFAULT false, business_id UUID, business_name VARCHAR(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, UNIQUE(email))', v_schema);
+    EXECUTE format('CREATE TABLE IF NOT EXISTS %I.users (user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR(255) NOT NULL, password_hash VARCHAR(255) NOT NULL, name TEXT, phone VARCHAR(50), role VARCHAR(50) NOT NULL DEFAULT ''customer'' CHECK (role IN (''super_admin'', ''owner'', ''staff'', ''customer'')), two_factor_enabled BOOLEAN DEFAULT false, business_id UUID, business_name VARCHAR(255), pricing_plan VARCHAR(50), branding_enabled BOOLEAN DEFAULT false, branding_name VARCHAR(255), branding_logo_url TEXT, branding_primary_color VARCHAR(32), branding_secondary_color VARCHAR(32), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, UNIQUE(email))', v_schema);
     EXECUTE format('CREATE TABLE IF NOT EXISTS %I.verification_codes (code_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES %I.users(user_id) ON DELETE CASCADE, verification_code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)', v_schema, v_schema);
     EXECUTE format('CREATE TABLE IF NOT EXISTS %I.password_reset_tokens (token_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES %I.users(user_id) ON DELETE CASCADE, token VARCHAR(255) UNIQUE, token_hash VARCHAR(64), expires_at TIMESTAMP WITH TIME ZONE NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)', v_schema, v_schema);
     EXECUTE format('CREATE TABLE IF NOT EXISTS %I.product_categories (category_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(100) NOT NULL UNIQUE, display_order INTEGER NOT NULL DEFAULT 0)', v_schema);
     EXECUTE format('CREATE TABLE IF NOT EXISTS %I.products (product_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(255) NOT NULL, category VARCHAR(100), price DECIMAL(15, 2) NOT NULL, quantity INTEGER NOT NULL DEFAULT 0, description TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, business_id UUID)', v_schema);
     EXECUTE format('CREATE TABLE IF NOT EXISTS %I.inventory_images (image_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), product_id UUID NOT NULL REFERENCES %I.products(product_id) ON DELETE CASCADE, image_url VARCHAR(500) NOT NULL, is_main BOOLEAN DEFAULT false, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)', v_schema, v_schema);
-    EXECUTE format('CREATE TABLE IF NOT EXISTS %I.orders (order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES %I.users(user_id) ON DELETE RESTRICT, order_number VARCHAR(50) NOT NULL UNIQUE, total_amount DECIMAL(15, 2) NOT NULL, order_status VARCHAR(50) NOT NULL DEFAULT ''pending'' CHECK (order_status IN (''pending'', ''confirmed'', ''processing'', ''shipped'', ''delivered'', ''cancelled'')), shipping_address TEXT, ordered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)', v_schema, v_schema);
+    EXECUTE format('CREATE TABLE IF NOT EXISTS %I.orders (
+        order_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES %I.users(user_id) ON DELETE RESTRICT,
+        order_number VARCHAR(50) NOT NULL UNIQUE,
+        total_amount DECIMAL(15, 2) NOT NULL,
+        order_status VARCHAR(50) NOT NULL DEFAULT ''pending'' CHECK (order_status IN (''pending'', ''confirmed'', ''processing'', ''shipped'', ''delivered'', ''cancelled'')),
+        shipping_address TEXT,
+        delivery_mode VARCHAR(50) NOT NULL DEFAULT ''SELLER_SELF'' CHECK (delivery_mode IN (''SELLER_SELF'', ''COURIER'', ''RIDER_MARKETPLACE'', ''CUSTOMER_PICKUP'')),
+        shipping_fee DECIMAL(15, 2) NOT NULL DEFAULT 0,
+        ordered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )', v_schema, v_schema);
     EXECUTE format('CREATE TABLE IF NOT EXISTS %I.order_items (order_item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES %I.orders(order_id) ON DELETE CASCADE, product_id UUID NOT NULL REFERENCES %I.products(product_id) ON DELETE RESTRICT, inventory_image_id UUID REFERENCES %I.inventory_images(image_id) ON DELETE SET NULL, quantity INTEGER NOT NULL CHECK (quantity > 0), price_at_order DECIMAL(15, 2) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)', v_schema, v_schema, v_schema, v_schema);
-    EXECUTE format('CREATE TABLE IF NOT EXISTS %I.payments (payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES %I.orders(order_id) ON DELETE RESTRICT, user_id UUID NOT NULL REFERENCES %I.users(user_id) ON DELETE RESTRICT, amount DECIMAL(15, 2) NOT NULL, transaction_id TEXT, payment_status VARCHAR(50) NOT NULL DEFAULT ''pending'' CHECK (payment_status IN (''pending'', ''completed'', ''failed'')), payment_method VARCHAR(50) DEFAULT ''M-Pesa'', created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)', v_schema, v_schema, v_schema);
-    EXECUTE format('CREATE TABLE IF NOT EXISTS %I.shipments (shipment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES %I.orders(order_id) ON DELETE RESTRICT, courier_service VARCHAR(100), tracking_number VARCHAR(100), status VARCHAR(50) NOT NULL DEFAULT ''pending'' CHECK (status IN (''pending'', ''shipped'', ''in_transit'', ''delivered'')), shipped_at TIMESTAMP WITH TIME ZONE, delivered_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)', v_schema, v_schema);
+    EXECUTE format('CREATE TABLE IF NOT EXISTS %I.payments (payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES %I.orders(order_id) ON DELETE RESTRICT, user_id UUID NOT NULL REFERENCES %I.users(user_id) ON DELETE RESTRICT, amount DECIMAL(15, 2) NOT NULL, transaction_id TEXT, payment_status VARCHAR(50) NOT NULL DEFAULT ''pending'' CHECK (payment_status IN (''pending'', ''completed'', ''failed'', ''cancelled'')), payment_method VARCHAR(50) DEFAULT ''M-Pesa'', created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)', v_schema, v_schema, v_schema);
+    EXECUTE format('CREATE TABLE IF NOT EXISTS %I.shipments (
+        shipment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_id UUID NOT NULL REFERENCES %I.orders(order_id) ON DELETE RESTRICT,
+        delivery_mode VARCHAR(50) NOT NULL DEFAULT ''SELLER_SELF'' CHECK (delivery_mode IN (''SELLER_SELF'', ''COURIER'', ''RIDER_MARKETPLACE'', ''CUSTOMER_PICKUP'')),
+        courier_service VARCHAR(100),
+        tracking_number VARCHAR(100),
+        rider_name VARCHAR(255),
+        rider_phone VARCHAR(50),
+        rider_vehicle VARCHAR(100),
+        rider_job_id VARCHAR(100),
+        pickup_location TEXT,
+        status VARCHAR(50) NOT NULL DEFAULT ''CREATED'' CHECK (status IN (''CREATED'', ''PICKED_UP'', ''IN_TRANSIT'', ''OUT_FOR_DELIVERY'', ''READY_FOR_PICKUP'', ''DELIVERED'', ''COLLECTED'', ''ESCROW_RELEASED'')),
+        shipped_at TIMESTAMP WITH TIME ZONE,
+        delivered_at TIMESTAMP WITH TIME ZONE,
+        otp_code VARCHAR(10),
+        otp_verified_at TIMESTAMP WITH TIME ZONE,
+        escrow_released_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )', v_schema, v_schema);
     EXECUTE format('CREATE INDEX IF NOT EXISTS idx_users_email ON %I.users(email)', v_schema);
     EXECUTE format('CREATE INDEX IF NOT EXISTS idx_verification_codes_user ON %I.verification_codes(user_id)', v_schema);
     EXECUTE format('CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON %I.verification_codes(expires_at)', v_schema);

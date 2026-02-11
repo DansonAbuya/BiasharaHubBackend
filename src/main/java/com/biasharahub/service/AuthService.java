@@ -64,6 +64,9 @@ public class AuthService {
                 .role("customer")
                 .twoFactorEnabled(true)  // used as "needs initial verification" flag for customers
                 .build();
+        if (request.getPhone() != null && !request.getPhone().isBlank()) {
+            user.setPhone(request.getPhone().trim());
+        }
         user = userRepository.save(user);
         verificationCodeService.createAndSendWelcomeVerification(user);
         return LoginResponse.builder()
@@ -154,6 +157,7 @@ public class AuthService {
                 .id(user.getUserId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .phone(user.getPhone())
                 .role(user.getRole())
                 .businessId(user.getBusinessId() != null ? user.getBusinessId().toString() : null)
                 .businessName(user.getBusinessName())

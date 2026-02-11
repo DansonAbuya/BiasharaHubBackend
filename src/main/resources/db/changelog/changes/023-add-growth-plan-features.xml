@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="023-add-growth-plan-features" author="Danson Abuya">
+        <comment>Add Growth plan feature flags to users table in all tenant schemas</comment>
+        <sqlFile path="db/changelog/changes/023-add-growth-plan-features.sql" splitStatements="false"/>
+    </changeSet>
+
+</databaseChangeLog>

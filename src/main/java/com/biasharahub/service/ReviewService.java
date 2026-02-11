@@ -10,6 +10,8 @@ import com.biasharahub.repository.OrderReviewRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ public class ReviewService {
     private final UserRepository userRepository;
 
     @Transactional
+    @CacheEvict(cacheNames = {"orderReviews", "businessRatings"}, allEntries = true)
     public OrderReviewDto createReview(AuthenticatedUser currentUser, CreateReviewRequest request) {
         User reviewer = userRepository.findById(currentUser.userId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -48,10 +51,18 @@ public class ReviewService {
         return toDto(review);
     }
 
+    @Cacheable(
+            cacheNames = "orderReviews",
+            key = "T(com.biasharahub.config.TenantContext).getTenantSchema() + '|' + #orderId"
+    )
     public Optional<OrderReviewDto> getReviewForOrder(UUID orderId) {
         return reviewRepository.findByOrderOrderId(orderId).map(this::toDto);
     }
 
+    @Cacheable(
+            cacheNames = "businessRatings",
+            key = "T(com.biasharahub.config.TenantContext).getTenantSchema() + '|' + #businessId"
+    )
     public Double getAverageRatingForBusiness(UUID businessId) {
         return reviewRepository.getAverageRatingByBusinessId(businessId);
     }

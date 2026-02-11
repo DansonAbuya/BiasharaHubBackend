@@ -27,6 +27,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     /** Find users by role (e.g. customers for staff/owner "order for" dropdown). */
     List<User> findByRoleIgnoreCaseOrderByNameAsc(String role);
 
+    /** Find customer by phone (for WhatsApp chatbot). Phone should be normalized (e.g. +254712345678 or 0712345678). */
+    java.util.Optional<User> findFirstByRoleIgnoreCaseAndPhone(String role, String phone);
+
     /** Find owners pending verification for admin review queue. */
     List<User> findByRoleIgnoreCaseAndVerificationStatusOrderByCreatedAtAsc(String role, String verificationStatus);
 }

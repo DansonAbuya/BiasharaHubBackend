@@ -5,7 +5,13 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
 
-    <changeSet id="012-create-tenant-wallet-ledger" author="cursor-ai">
+    <changeSet id="012-create-tenant-wallet-ledger" author="Danson Abuya">
+        <!-- If table already exists (e.g. applied with previous author), mark this changeset as ran without executing -->
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="tenant_wallet_entries" schemaName="public"/>
+            </not>
+        </preConditions>
 
         <createTable tableName="tenant_wallet_entries" schemaName="public">
             <column name="entry_id" type="UUID">

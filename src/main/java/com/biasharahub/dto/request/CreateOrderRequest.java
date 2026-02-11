@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -21,6 +22,17 @@ public class CreateOrderRequest {
     private List<OrderItemRequest> items;
 
     private String shippingAddress;
+
+    /**
+     * Preferred delivery mode selected by the customer.
+     * SELLER_SELF, COURIER, RIDER_MARKETPLACE, CUSTOMER_PICKUP
+     */
+    private String deliveryMode;
+
+    /**
+     * Shipping fee to charge the customer (optional; defaults to 0 on backend).
+     */
+    private BigDecimal shippingFee;
 
     /** When staff/owner place an order on behalf of a customer, set this to the customer's user ID. */
     private java.util.UUID orderForCustomerId;

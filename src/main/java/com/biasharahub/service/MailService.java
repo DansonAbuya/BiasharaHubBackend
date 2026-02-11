@@ -45,6 +45,21 @@ public class MailService {
     }
 
     /**
+     * Send WhatsApp link verification code. Used when a user links their WhatsApp number to an existing account.
+     */
+    public void sendWhatsAppLinkCode(@NonNull String toEmail, @NonNull String code) {
+        String text = """
+                Hi,
+
+                Your BiasharaHub WhatsApp link code is: %s
+
+                Enter this code in the WhatsApp chat to link your number. This code expires in 10 minutes.
+                If you did not request this, you can safely ignore this email.
+                """.formatted(code);
+        send(toEmail, "Your BiasharaHub WhatsApp link code", text);
+    }
+
+    /**
      * Send a generic email (e.g. password reset, notifications). Tenant from context.
      */
     public void send(@NonNull String toEmail, @NonNull String subject, @NonNull String textBody) {

@@ -40,7 +40,11 @@ spring:
     change-log: classpath:db/changelog/db.changelog-master.xml
 
   cache:
-    type: simple
+    # Use Redis as backing store for Spring Cache (requires running Redis instance)
+    type: redis
+    redis:
+      # 5 minutes default TTL for cache entries
+      time-to-live: 300000
 
   servlet:
     multipart:
@@ -53,11 +57,14 @@ spring:
     oauth2:
       client:
         registration: {}
-  # Redis (uncomment when available)
-  # data:
-  #   redis:
-  #     host: ${REDIS_HOST:localhost}
-  #     port: ${REDIS_PORT:6379}
+  # Redis connection for cache and other features
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      repositories:
+        # We only use Redis as a cache backend, not as a Spring Data store
+        enabled: false
 
   # Kafka (used only when app.kafka.enabled=true; see KafkaConfig)
   kafka:
@@ -101,7 +108,7 @@ app:
     postmark:
       server-token: ${POSTMARK_SERVER_TOKEN:}
       from: ${MAIL_FROM:}
-      message-stream: ${POSTMARK_MESSAGE_STREAM:}
+      message-stream: ${POSTMARK_MESSAGE_STREAM:outbound}
     # Gmail OAuth: set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, MAIL_FROM
     # or use application-local.yml (gitignored). No defaults here to avoid committing secrets.
     gmail:
@@ -141,7 +148,7 @@ app:
     enabled: ${MPESA_ENABLED:false}
     environment: ${MPESA_ENV:sandbox}          # sandbox or production
     base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
-    shortcode: ${MPESA_SHORTCODE:}       # use your sandbox Lipa Na M-Pesa Online shortcode from Daraja portal (often 174379)
+    shortcode: ${MPESA_SHORTCODE:174379}       # use your sandbox Lipa Na M-Pesa Online shortcode from Daraja portal (often 174379)
     passkey: ${MPESA_PASSKEY:}                 # from Daraja app "Lipa Na M-Pesa Online" > Test credentials
     consumer-key: ${MPESA_CONSUMER_KEY:}       # from your Daraja app
     consumer-secret: ${MPESA_CONSUMER_SECRET:} # from your Daraja app
@@ -149,6 +156,17 @@ app:
     b2c-callback-url: ${MPESA_B2C_CALLBACK_URL:}
     payout-product-name: ${MPESA_PAYOUT_PRODUCT_NAME:testapi}
     timeout: ${MPESA_TIMEOUT_MS:10000}
+
+  # WhatsApp via Twilio: order/payment/shipment notifications. Set enabled=true and Twilio credentials.
+  # Use Twilio Sandbox (https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn) or a WhatsApp Business number.
+  whatsapp:
+    enabled: ${WHATSAPP_ENABLED:true}
+    twilio-account-sid: ${TWILIO_ACCOUNT_SID:}
+    twilio-auth-token: ${TWILIO_AUTH_TOKEN:}
+    # Sender: Sandbox e.g. whatsapp:+14155238886, or your WhatsApp Business number (E.164 with whatsapp: prefix)
+    from-number: ${TWILIO_WHATSAPP_FROM:}
+  # Storefront URL for WhatsApp chatbot (order links, register link)
+  storefront-url: ${STOREFRONT_URL:http://localhost:3000}
 
   # (R2 for product/verification uploads is at top-level "r2:" so R2Config can bind it)
 

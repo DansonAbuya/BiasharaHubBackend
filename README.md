@@ -2,6 +2,8 @@
 
 Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
 
+**@ [Sysnova Technologies](https://sysnovatechnologies.com).**
+
 **This repository is backend-only.** The frontend lives in a separate project (e.g. **BisharaHubFrontend**) and must run on its own. The two interact **only via HTTP API calls**: frontend at `http://localhost:3000` (or your dev URL) calls this API at `http://localhost:5050/api`. CORS is configured to allow the frontend origin.
 
 ## Tech Stack
@@ -290,4 +292,4 @@ Liquibase runs automatically on application startup.
 
 ## License
 
-Proprietary - BiasharaHub
+Proprietary - BiasharaHub. @ Sysnova Technologies.

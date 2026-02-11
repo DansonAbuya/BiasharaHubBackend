@@ -41,6 +41,7 @@ public class UserController {
                         .id(u.getUserId())
                         .name(u.getName())
                         .email(u.getEmail())
+                        .phone(u.getPhone())
                         .role(u.getRole())
                         .businessId(u.getBusinessId() != null ? u.getBusinessId().toString() : null)
                         .businessName(u.getBusinessName())
@@ -48,6 +49,37 @@ public class UserController {
                         .sellerTier(u.getSellerTier())
                         .applyingForTier(u.getApplyingForTier())
                         .build()))
+                .orElse(ResponseEntity.status(401).build());
+    }
+
+    /** Update current user's profile (name, phone). Customers use this to add their phone for WhatsApp. */
+    @PatchMapping("/me")
+    public ResponseEntity<UserDto> updateMyProfile(@AuthenticationPrincipal AuthenticatedUser auth,
+                                                   @RequestBody Map<String, String> body) {
+        if (auth == null) return ResponseEntity.status(401).build();
+        return userRepository.findById(auth.userId())
+                .map(u -> {
+                    if (body.containsKey("name") && body.get("name") != null) {
+                        u.setName(body.get("name").trim());
+                    }
+                    if (body.containsKey("phone")) {
+                        String phone = body.get("phone");
+                        u.setPhone(phone != null && !phone.isBlank() ? phone.trim() : null);
+                    }
+                    User saved = userRepository.save(u);
+                    return ResponseEntity.ok(UserDto.builder()
+                            .id(saved.getUserId())
+                            .name(saved.getName())
+                            .email(saved.getEmail())
+                            .phone(saved.getPhone())
+                            .role(saved.getRole())
+                            .businessId(saved.getBusinessId() != null ? saved.getBusinessId().toString() : null)
+                            .businessName(saved.getBusinessName())
+                            .verificationStatus(saved.getVerificationStatus())
+                            .sellerTier(saved.getSellerTier())
+                            .applyingForTier(saved.getApplyingForTier())
+                            .build());
+                })
                 .orElse(ResponseEntity.status(401).build());
     }
 
@@ -83,6 +115,7 @@ public class UserController {
                         .id(u.getUserId())
                         .name(u.getName())
                         .email(u.getEmail())
+                        .phone(u.getPhone())
                         .role(u.getRole())
                         .businessId(u.getBusinessId() != null ? u.getBusinessId().toString() : null)
                         .businessName(u.getBusinessName())

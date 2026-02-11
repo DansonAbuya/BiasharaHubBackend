@@ -25,7 +25,8 @@ public class AnalyticsController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAnalytics(@AuthenticationPrincipal AuthenticatedUser user) {
         if (user == null) return ResponseEntity.status(401).build();
-        if (!"owner".equalsIgnoreCase(user.role()) && !"staff".equalsIgnoreCase(user.role())) {
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        if (!"owner".equals(role) && !"staff".equals(role) && !"super_admin".equals(role) && !"assistant_admin".equals(role)) {
             return ResponseEntity.status(403).build();
         }
         BigDecimal totalRevenue = orderRepository.sumTotalRevenue();

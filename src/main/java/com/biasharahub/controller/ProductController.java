@@ -13,6 +13,7 @@ import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.R2StorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -40,7 +41,11 @@ public class ProductController {
 
     /** List shops (verified owners’ businesses) for marketplace. Each seller has one shop; only verified shops appear. No auth required. */
     @GetMapping("/businesses")
-    public ResponseEntity<List<BusinessDto>> listBusinesses() {
+    @Cacheable(
+            cacheNames = "marketplaceBusinesses",
+            key = "T(com.biasharahub.config.TenantContext).getTenantSchema()"
+    )
+    public List<BusinessDto> listBusinesses() {
         List<BusinessDto> businesses = userRepository.findByRoleIgnoreCaseAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified")
                 .stream()
                 .map(u -> BusinessDto.builder()
@@ -50,12 +55,16 @@ public class ProductController {
                         .sellerTier(u.getSellerTier() != null ? u.getSellerTier() : "tier1")
                         .build())
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(businesses);
+        return businesses;
     }
 
     /** List product categories for frontend dropdown (e.g. when uploading/creating a product). No auth required. */
     @GetMapping("/categories")
-    public ResponseEntity<List<ProductCategoryDto>> listCategories() {
+    @Cacheable(
+            cacheNames = "productCategories",
+            key = "T(com.biasharahub.config.TenantContext).getTenantSchema()"
+    )
+    public List<ProductCategoryDto> listCategories() {
         List<ProductCategoryDto> categories = productCategoryRepository.findAllByOrderByDisplayOrderAscNameAsc()
                 .stream()
                 .map(c -> ProductCategoryDto.builder()
@@ -64,7 +73,7 @@ public class ProductController {
                         .displayOrder(c.getDisplayOrder())
                         .build())
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(categories);
+        return categories;
     }
 
     /**
@@ -73,7 +82,12 @@ public class ProductController {
      * - Customers / anonymous: only verified businesses and approved products; optional filter by businessId (shop) so customers see all products for the shop they select.
      */
     @GetMapping
-    public ResponseEntity<List<ProductDto>> listProducts(
+    @Cacheable(
+            cacheNames = "publicProducts",
+            key = "T(com.biasharahub.config.TenantContext).getTenantSchema() + '|' + T(java.util.Objects).toString(#category) + '|' + T(java.util.Objects).toString(#businessId) + '|' + T(java.util.Objects).toString(#businessName) + '|' + T(java.util.Objects).toString(#ownerId)",
+            condition = "#currentUser == null || (#currentUser.role() != null && #currentUser.role().toLowerCase() == 'customer')"
+    )
+    public List<ProductDto> listProducts(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) UUID businessId,
             @RequestParam(required = false) String businessName,
@@ -117,7 +131,7 @@ public class ProductController {
                             && "approved".equalsIgnoreCase(p.getModerationStatus()))
                     .toList();
         }
-        return ResponseEntity.ok(products.stream().map(this::toDto).collect(Collectors.toList()));
+        return products.stream().map(this::toDto).collect(Collectors.toList());
     }
 
     /** Resolve businessId, businessName, or ownerId to a set of business IDs for customer filter. Returns null if no filter. */
