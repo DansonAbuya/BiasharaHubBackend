@@ -15,6 +15,8 @@ public class UserDto {
     private UUID id;
     private String name;
     private String email;
+    /** Optional phone for WhatsApp and notifications (e.g. +254712345678). */
+    private String phone;
     private String role;
     private String businessId;
     private String businessName;

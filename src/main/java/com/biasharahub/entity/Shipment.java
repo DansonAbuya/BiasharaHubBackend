@@ -24,21 +24,57 @@ public class Shipment {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    @Column(name = "delivery_mode", nullable = false)
+    @Builder.Default
+    private String deliveryMode = "SELLER_SELF"; // SELLER_SELF, COURIER, RIDER_MARKETPLACE, CUSTOMER_PICKUP
+
+    // Courier delivery fields
     @Column(name = "courier_service")
     private String courierService;
 
     @Column(name = "tracking_number")
     private String trackingNumber;
 
+    // Rider marketplace fields
+    @Column(name = "rider_name")
+    private String riderName;
+
+    @Column(name = "rider_phone")
+    private String riderPhone;
+
+    @Column(name = "rider_vehicle")
+    private String riderVehicle;
+
+    @Column(name = "rider_job_id")
+    private String riderJobId;
+
+    // Customer pickup fields
+    @Column(name = "pickup_location")
+    private String pickupLocation;
+
+    /**
+     * Common lifecycle:
+     * CREATED -> PICKED_UP -> IN_TRANSIT -> OUT_FOR_DELIVERY / READY_FOR_PICKUP ->
+     * DELIVERED / COLLECTED -> ESCROW_RELEASED
+     */
     @Column(nullable = false)
     @Builder.Default
-    private String status = "pending";
+    private String status = "CREATED";
 
     @Column(name = "shipped_at")
     private Instant shippedAt;
 
     @Column(name = "delivered_at")
     private Instant deliveredAt;
+
+    @Column(name = "otp_code")
+    private String otpCode;
+
+    @Column(name = "otp_verified_at")
+    private Instant otpVerifiedAt;
+
+    @Column(name = "escrow_released_at")
+    private Instant escrowReleasedAt;
 
     @Column(name = "created_at")
     private Instant createdAt;

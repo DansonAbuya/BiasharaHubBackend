@@ -29,4 +29,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.orderStatus = 'pending'")
     long countPendingOrders();
+
+    /** Customer phone for WhatsApp; used without loading full Order/User. */
+    @Query("SELECT u.phone FROM Order o JOIN o.user u WHERE o.orderId = :orderId")
+    Optional<String> findCustomerPhoneByOrderId(@Param("orderId") UUID orderId);
 }

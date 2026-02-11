@@ -23,6 +23,8 @@ public class OrderDto {
     private String businessId;
     private List<OrderItemDto> items;
     private BigDecimal total;
+    private String deliveryMode;
+    private BigDecimal shippingFee;
     private String status;
     private String paymentStatus;
     private String paymentMethod;

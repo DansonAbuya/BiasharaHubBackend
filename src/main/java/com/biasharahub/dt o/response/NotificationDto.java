@@ -6,15 +6,24 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductCategoryDto implements Serializable {
+public class NotificationDto implements Serializable {
+
     private static final long serialVersionUID = 1L;
+
     private UUID id;
-    private String name;
-    private Integer displayOrder;
+    private String type;
+    private String title;
+    private String message;
+    private String actionUrl;
+    private String data;
+    private boolean read;
+    private Instant createdAt;
 }
+

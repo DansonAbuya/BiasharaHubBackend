@@ -8,9 +8,7 @@ import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.PaymentRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
-import com.biasharahub.service.MpesaClient;
-import com.biasharahub.service.OrderEventPublisher;
-import com.biasharahub.service.TenantWalletService;
+import com.biasharahub.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +32,8 @@ public class PaymentController {
     private final OrderEventPublisher orderEventPublisher;
     private final MpesaClient mpesaClient;
     private final TenantWalletService tenantWalletService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
+    private final InAppNotificationService inAppNotificationService;
 
     /** Initiate payment for an order via M-PESA STK Push. */
     @PostMapping("/{orderId}/payments/initiate")
@@ -76,6 +76,21 @@ public class PaymentController {
                 .status("pending")
                 .message("M-PESA STK push initiated. Complete the payment on your phone to confirm.")
                 .build();
+
+        // Notify WhatsApp chatbot (if enabled) that a payment request was sent
+        try {
+            whatsAppNotificationService.notifyPaymentRequested(order, payment);
+        } catch (Exception e) {
+            // Do not fail the payment initiation just because notifications failed
+        }
+
+        // In-app notification for payment request
+        try {
+            inAppNotificationService.notifyPaymentRequested(order, payment);
+        } catch (Exception e) {
+            // ignore failures
+        }
+
         return ResponseEntity.ok(body);
     }
 

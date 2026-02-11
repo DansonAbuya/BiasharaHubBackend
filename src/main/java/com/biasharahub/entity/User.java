@@ -31,6 +31,13 @@ public class User {
     @Column(name = "name", columnDefinition = "TEXT")
     private String name;
 
+    /**
+     * Optional phone number for WhatsApp/SMS (E.164 or national format).
+     * Used for order/payment/shipment notifications when WhatsApp is enabled.
+     */
+    @Column(name = "phone", length = 50)
+    private String phone;
+
     @Column(nullable = false)
     @Builder.Default
     private String role = "customer";
@@ -44,6 +51,55 @@ public class User {
 
     @Column(name = "business_name")
     private String businessName;
+
+    /**
+     * Marketing pricing plan for this seller: e.g. basic, growth, enterprise.
+     * Admin-controlled; used to enable features and billing models.
+     */
+    @Column(name = "pricing_plan", length = 50)
+    @Builder.Default
+    private String pricingPlan = "starter";
+
+    /**
+     * Whether this seller has white-label branding enabled (custom brand instead of platform default).
+     */
+    @Column(name = "branding_enabled")
+    @Builder.Default
+    private Boolean brandingEnabled = false;
+
+    /** Optional white-label brand name for this seller's storefront. */
+    @Column(name = "branding_name")
+    private String brandingName;
+
+    /** Optional logo URL (e.g. R2 URL) for white-label storefront. */
+    @Column(name = "branding_logo_url", columnDefinition = "TEXT")
+    private String brandingLogoUrl;
+
+    /** Optional primary theme color (CSS color string, e.g. #0f172a or oklch()). */
+    @Column(name = "branding_primary_color", length = 32)
+    private String brandingPrimaryColor;
+
+    /** Optional secondary/accent color. */
+    @Column(name = "branding_secondary_color", length = 32)
+    private String brandingSecondaryColor;
+
+    // --- Growth plan feature flags (only active when pricing_plan = 'growth') ---
+
+    @Column(name = "growth_inventory_automation")
+    @Builder.Default
+    private Boolean growthInventoryAutomation = false;
+
+    @Column(name = "growth_whatsapp_enabled")
+    @Builder.Default
+    private Boolean growthWhatsappEnabled = false;
+
+    @Column(name = "growth_analytics_enabled")
+    @Builder.Default
+    private Boolean growthAnalyticsEnabled = false;
+
+    @Column(name = "growth_delivery_integrations")
+    @Builder.Default
+    private Boolean growthDeliveryIntegrations = false;
 
     /**
      * Seller tier: tier1 (basic), tier2 (verified), tier3 (premium/trusted).

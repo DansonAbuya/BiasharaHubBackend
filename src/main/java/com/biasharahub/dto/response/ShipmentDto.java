@@ -15,10 +15,19 @@ import java.util.UUID;
 public class ShipmentDto {
     private UUID id;
     private UUID orderId;
+    private String deliveryMode;
     private String status;
     private String carrier;
     private String trackingNumber;
+    private String riderName;
+    private String riderPhone;
+    private String riderVehicle;
+    private String riderJobId;
+    private String pickupLocation;
     private Instant shippedAt;
     private Instant estimatedDelivery;
     private Instant actualDelivery;
+    private Instant escrowReleasedAt;
+    // For Phase 1 MVP we expose OTP so customer can see it in-app.
+    private String otpCode;
 }

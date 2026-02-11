@@ -21,5 +21,12 @@
     <include file="db/changelog/changes/014-seller-tiers.xml"/>
     <include file="db/changelog/changes/015-add-applying-for-tier.xml"/>
     <include file="db/changelog/changes/016-encryption-and-token-hash.xml"/>
+    <include file="db/changelog/changes/017-extend-shipments-schema.xml"/>
+    <include file="db/changelog/changes/018-extend-orders-shipping.xml"/>
+    <include file="db/changelog/changes/019-extend-payments-status.xml"/>
+    <include file="db/changelog/changes/020-add-users-phone.xml"/>
+    <include file="db/changelog/changes/021-add-pricing-and-branding.xml"/>
+    <include file="db/changelog/changes/022-create-notifications-table.xml"/>
+    <include file="db/changelog/changes/023-add-growth-plan-features.xml"/>
 
 </databaseChangeLog>

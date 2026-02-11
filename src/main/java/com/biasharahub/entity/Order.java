@@ -38,6 +38,23 @@ public class Order {
     @Builder.Default
     private String orderStatus = "pending";
 
+    /**
+     * Preferred delivery mode selected at checkout.
+     * Mirrors shipment deliveryMode once shipment is created.
+     * SELLER_SELF, COURIER, RIDER_MARKETPLACE, CUSTOMER_PICKUP
+     */
+    @Column(name = "delivery_mode", nullable = false)
+    @Builder.Default
+    private String deliveryMode = "SELLER_SELF";
+
+    /**
+     * Shipping fee charged to the customer (in KES).
+     * Included in totalAmount.
+     */
+    @Column(name = "shipping_fee", precision = 15, scale = 2)
+    @Builder.Default
+    private BigDecimal shippingFee = BigDecimal.ZERO;
+
     @Convert(converter = EncryptedStringAttributeConverter.class)
     @Column(name = "shipping_address", columnDefinition = "TEXT")
     private String shippingAddress;
