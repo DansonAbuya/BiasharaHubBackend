@@ -29,7 +29,14 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
    - **Maven:** `mvn validate -Pinit-db` or `mvn spring-boot:run -Pinit-db` (runs init before start)
    - **Manual:** `psql -U postgres -h localhost -f scripts/init-database.sql`
 
-2. **Configure environment** (required if your PostgreSQL password is not `postgres`):
+2. **Set default schema (one-time, security best practice):**  
+   The app relies on the server default schema instead of the JDBC URL. Run as a DB admin (e.g. `postgres`):
+   ```bash
+   psql -U postgres -h localhost -d biasharahub -f src/main/resources/db/scripts/set-default-schema.sql
+   ```
+   Or run the `ALTER DATABASE biasharahub SET search_path TO public;` statement from that file in any SQL client. New connections will then use `public` by default.
+
+3. **Configure environment** (required if your PostgreSQL password is not `postgres`):
    ```bash
    # Windows (PowerShell)
    $env:DB_USERNAME="postgres"
@@ -45,16 +52,16 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
    ```
    The app auto-creates the `biasharahub` database on startup if it doesn't exist. Set `DB_SKIP_BOOTSTRAP=true` to disable this.
 
-3. **Add logo and favicon:**
+4. **Add logo and favicon:**
    Copy `logo.png` and `favicon.png` to `src/main/resources/static/`
    (Uses BiasharaHub logo: dark green briefcase with bar chart, orange location pin)
 
-4. **Run the application:**
+5. **Run the application:**
    ```bash
    mvn spring-boot:run
    ```
 
-5. **API base URL:** `http://localhost:8080/api`
+6. **API base URL:** `http://localhost:8080/api`
 
 ## Multi-Tenancy (Schema per Tenant)
 

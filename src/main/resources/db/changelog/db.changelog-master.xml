@@ -35,5 +35,9 @@
     <include file="db/changelog/changes/028-trust-safety-disputes.xml"/>
     <include file="db/changelog/changes/029-courier-services-table.xml"/>
     <include file="db/changelog/changes/030-courier-provider-integration.xml"/>
+    <include file="db/changelog/changes/031-add-assigned-courier-to-shipments.xml"/>
+    <include file="db/changelog/changes/032-update-create-tenant-schema-courier-support.xml"/>
+    <include file="db/changelog/changes/033-tenant-expenses-table.xml"/>
+    <include file="db/changelog/changes/034-add-expenses-to-create-tenant-schema.xml"/>
 
 </databaseChangeLog>

@@ -35,6 +35,11 @@ public class Shipment {
     @Column(name = "tracking_number")
     private String trackingNumber;
 
+    /** Courier user assigned to this delivery (for courier portal). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_courier_id")
+    private User assignedCourier;
+
     // Rider marketplace fields
     @Column(name = "rider_name")
     private String riderName;

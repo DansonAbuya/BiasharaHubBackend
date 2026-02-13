@@ -15,6 +15,7 @@ import java.util.UUID;
 public class ShipmentDto {
     private UUID id;
     private UUID orderId;
+    private UUID assignedCourierId;
     private String deliveryMode;
     private String status;
     private String carrier;

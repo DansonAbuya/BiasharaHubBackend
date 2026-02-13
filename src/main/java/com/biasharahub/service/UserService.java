@@ -2,6 +2,7 @@ package com.biasharahub.service;
 
 import com.biasharahub.config.TenantContext;
 import com.biasharahub.dto.request.AddAssistantAdminRequest;
+import com.biasharahub.dto.request.AddCourierRequest;
 import com.biasharahub.dto.request.AddOwnerRequest;
 import com.biasharahub.dto.request.AddStaffRequest;
 import com.biasharahub.dto.response.UserDto;
@@ -130,6 +131,43 @@ public class UserService {
     }
 
     /**
+     * Owner adds a courier. Phone is required for matching shipments by rider_phone.
+     * Temporary password is generated and sent by email.
+     */
+    @Transactional
+    public UserDto addCourier(AuthenticatedUser currentUser, AddCourierRequest request) {
+        if (!"owner".equalsIgnoreCase(currentUser.role())) {
+            throw new IllegalArgumentException("Only owners can add couriers");
+        }
+        User owner = userRepository.findById(currentUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Owner not found"));
+        if (owner.getBusinessId() == null || owner.getBusinessName() == null) {
+            throw new IllegalArgumentException("Owner business is not set");
+        }
+        if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
+            throw new IllegalArgumentException("Email already registered");
+        }
+        String phone = request.getPhone() != null ? request.getPhone().trim() : "";
+        if (phone.isEmpty()) {
+            throw new IllegalArgumentException("Phone is required for couriers");
+        }
+        String tempPassword = generateTemporaryPassword();
+        User courier = User.builder()
+                .email(request.getEmail().toLowerCase())
+                .passwordHash(passwordEncoder.encode(tempPassword))
+                .name(request.getName())
+                .phone(phone)
+                .role("courier")
+                .twoFactorEnabled(false)
+                .businessId(owner.getBusinessId())
+                .businessName(owner.getBusinessName())
+                .build();
+        courier = userRepository.save(courier);
+        mailService.sendWelcomeCourier(courier.getEmail(), courier.getName(), owner.getBusinessName(), tempPassword);
+        return toUserDto(courier);
+    }
+
+    /**
      * Platform admin adds an assistant admin. Temporary password is generated and sent by email.
      * 2FA is always on for assistant admins and cannot be disabled.
      */
@@ -174,11 +212,26 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    public List<UserDto> listCouriers(AuthenticatedUser currentUser) {
+        if (!"owner".equalsIgnoreCase(currentUser.role())) {
+            throw new IllegalArgumentException("Only owners can list couriers");
+        }
+        User owner = userRepository.findById(currentUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Owner not found"));
+        if (owner.getBusinessId() == null) {
+            return List.of();
+        }
+        return userRepository.findByRoleAndBusinessId("courier", owner.getBusinessId()).stream()
+                .map(this::toUserDto)
+                .collect(Collectors.toList());
+    }
+
     private UserDto toUserDto(User user) {
         return UserDto.builder()
                 .id(user.getUserId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .phone(user.getPhone())
                 .role(user.getRole())
                 .businessId(user.getBusinessId() != null ? user.getBusinessId().toString() : null)
                 .businessName(user.getBusinessName())

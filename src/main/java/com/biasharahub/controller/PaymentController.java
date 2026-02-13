@@ -124,4 +124,36 @@ public class PaymentController {
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    /**
+     * Update payment method for an order (M-Pesa or Bank). Used when customer pays via bank transfer.
+     */
+    @PatchMapping("/{orderId}/payments/{paymentId}/method")
+    @Transactional
+    public ResponseEntity<?> updatePaymentMethod(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID orderId,
+            @PathVariable UUID paymentId,
+            @RequestBody java.util.Map<String, String> body) {
+        if (user == null) return ResponseEntity.status(401).build();
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        boolean canUpdate = "owner".equals(role) || "staff".equals(role)
+                || "super_admin".equals(role) || "assistant_admin".equals(role);
+        if (!canUpdate) {
+            return ResponseEntity.status(403).body(java.util.Map.of("error", "Only staff/owner can update payment method."));
+        }
+        String method = body != null ? body.get("paymentMethod") : null;
+        if (method == null || method.isBlank()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "paymentMethod is required (M-Pesa or Bank)"));
+        }
+        String normalized = "bank".equalsIgnoreCase(method.trim()) ? "Bank" : "M-Pesa";
+        return paymentRepository.findById(paymentId)
+                .filter(p -> p.getOrder().getOrderId().equals(orderId))
+                .map(payment -> {
+                    payment.setPaymentMethod(normalized);
+                    paymentRepository.save(payment);
+                    return ResponseEntity.ok(java.util.Map.of("status", "updated", "paymentMethod", normalized));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

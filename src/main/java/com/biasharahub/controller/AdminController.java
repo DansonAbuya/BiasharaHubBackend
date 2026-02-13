@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 /**
- * Platform admin endpoints. Only super_admin can add owners and assistant admins.
+ * Platform admin endpoints. super_admin and assistant_admin can add owners (onboard businesses).
+ * Only super_admin can add assistant admins.
  * Owners receive a temporary password by email and can enable/disable 2FA.
  * Assistant admins have 2FA always on and cannot disable it.
  *
@@ -30,7 +31,7 @@ public class AdminController {
     }
 
     @PostMapping("/owners")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
     public ResponseEntity<?> addOwner(@Valid @RequestBody AddOwnerRequest request) {
         try {
             UserDto owner = userService.addOwner(request);

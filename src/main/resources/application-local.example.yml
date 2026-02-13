@@ -7,11 +7,14 @@
 # encryption:
 #   secret: "your-32-byte-minimum-secret-here"
 
-# Optional: M-Pesa STK Push callback must be HTTPS and publicly reachable.
-# For local dev, run: ngrok http 5050  (or similar), then set in env or here:
-#   MPESA_STK_CALLBACK_URL=https://YOUR-NGROK-URL.ngrok.io/api/payments/mpesa/stk-callback
-
 app:
+  # M-Pesa callbacks: uncomment and set to your public HTTPS URL (e.g. ngrok: run "ngrok http 5050" then use the https URL)
+  # mpesa:
+  #   stk-callback-url: "https://YOUR-NGROK-OR-DOMAIN/api/payments/mpesa/stk-callback"
+  #   b2c-callback-url: "https://YOUR-NGROK-OR-DOMAIN/api/payments/mpesa/b2c-callback"
+  # WhatsApp webhook: in Twilio Console set "When a message comes in" to this URL (must be HTTPS and public; use ngrok for local)
+  # whatsapp:
+  #   webhook-url: "https://YOUR-NGROK-OR-DOMAIN"   # Twilio will use: this + /api/webhooks/whatsapp
   mail:
     postmark:
       server-token: "POSTMARK_SERVER_TOKEN_HERE"

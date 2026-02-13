@@ -1,5 +1,6 @@
 package com.biasharahub.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -62,6 +63,7 @@ public class Product {
     private String moderationNotes;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     @Builder.Default
     private List<InventoryImage> images = new ArrayList<>();
 

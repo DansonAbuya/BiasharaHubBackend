@@ -11,6 +11,7 @@ import com.biasharahub.entity.Order;
 import com.biasharahub.entity.Shipment;
 import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.ShipmentRepository;
+import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.InAppNotificationService;
 import com.biasharahub.service.PayoutService;
@@ -35,6 +36,7 @@ public class ShipmentController {
 
     private final ShipmentRepository shipmentRepository;
     private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final InAppNotificationService inAppNotificationService;
     private final PayoutService payoutService;
@@ -99,10 +101,11 @@ public class ShipmentController {
         if (user == null) return ResponseEntity.status(401).<ShipmentDto>build();
         return shipmentRepository.findById(id)
                 .map(s -> {
+                    String prevStatus = s.getStatus();
                     if (dto.getStatus() != null) {
                         String newStatus = dto.getStatus();
                         s.setStatus(newStatus);
-                        if ("SHIPPED".equalsIgnoreCase(newStatus) && s.getShippedAt() == null) {
+                        if (("SHIPPED".equalsIgnoreCase(newStatus) || "IN_TRANSIT".equalsIgnoreCase(newStatus)) && s.getShippedAt() == null) {
                             s.setShippedAt(Instant.now());
                         }
                         if ("DELIVERED".equalsIgnoreCase(newStatus) && s.getDeliveredAt() == null) {
@@ -116,7 +119,24 @@ public class ShipmentController {
                     if (dto.getRiderVehicle() != null) s.setRiderVehicle(dto.getRiderVehicle());
                     if (dto.getRiderJobId() != null) s.setRiderJobId(dto.getRiderJobId());
                     if (dto.getPickupLocation() != null) s.setPickupLocation(dto.getPickupLocation());
+                    if (dto.getAssignedCourierId() != null) {
+                        s.setAssignedCourier(userRepository.findById(dto.getAssignedCourierId()).orElse(null));
+                    }
                     s = shipmentRepository.save(s);
+
+                    boolean justDispatched = !"CREATED".equalsIgnoreCase(s.getStatus()) && "CREATED".equalsIgnoreCase(prevStatus);
+                    if (justDispatched && ("IN_TRANSIT".equalsIgnoreCase(s.getStatus()) || "SHIPPED".equalsIgnoreCase(s.getStatus()))) {
+                        try {
+                            whatsAppNotificationService.notifyShipmentUpdated(s);
+                        } catch (Exception e) {
+                            log.warn("Failed to send WhatsApp dispatch notification: {}", e.getMessage());
+                        }
+                        try {
+                            inAppNotificationService.notifyShipmentUpdated(s);
+                        } catch (Exception e) {
+                            log.warn("Failed to create in-app dispatch notification: {}", e.getMessage());
+                        }
+                    }
                     return ResponseEntity.ok(toDto(s));
                 })
                 .orElse(ResponseEntity.status(404).<ShipmentDto>build());
@@ -273,6 +293,7 @@ public class ShipmentController {
         return ShipmentDto.builder()
                 .id(s.getShipmentId())
                 .orderId(s.getOrder().getOrderId())
+                .assignedCourierId(s.getAssignedCourier() != null ? s.getAssignedCourier().getUserId() : null)
                 .deliveryMode(s.getDeliveryMode())
                 .status(s.getStatus())
                 .carrier(s.getCourierService())

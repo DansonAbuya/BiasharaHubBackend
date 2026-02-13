@@ -16,6 +16,7 @@ spring:
             enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
 
   datasource:
+    # Default schema is set server-side (see db/scripts/set-default-schema.sql). Do not set currentSchema in URL.
     url: jdbc:postgresql://localhost:5432/biasharahub
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:password}
@@ -38,6 +39,9 @@ spring:
 
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.xml
+    # Use public schema explicitly so Liquibase works even if server-side set-default-schema.sql was not run
+    liquibase-schema: public
+    default-schema: public
 
   cache:
     # Use Redis as backing store for Spring Cache (requires running Redis instance)
@@ -120,7 +124,7 @@ app:
 
   # CORS (adjust for production)
   cors:
-    allowed-origins: http://localhost:3000,http://127.0.0.1:3000
+    allowed-origins: http://localhost:3000,http://127.0.0.1:3000databasechangeloglock
 
   # Kafka (event publishing for orders/payments). Set KAFKA_ENABLED=true and KAFKA_BOOTSTRAP_SERVERS to use.
   kafka:
@@ -145,16 +149,18 @@ app:
   # M-Pesa (Daraja) configuration for payments and payouts
   # All values (shortcode, passkey, consumer-key, consumer-secret) must come from your app at https://developer.safaricom.co.ke
   # "Merchant does not exist" (500.001.1001) = shortcode/credentials not valid for this app; use the ones from the Daraja portal.
-  # Callback URLs must be HTTPS and publicly reachable; for local dev use a tunnel (e.g. ngrok).
+  # Callback URLs must be HTTPS and publicly reachable; for local dev use a tunnel (e.g. ngrok http 5050).
   mpesa:
-    enabled: ${MPESA_ENABLED:true}
+    enabled: ${MPESA_ENABLED:false}
     environment: ${MPESA_ENV:sandbox}          # sandbox or production
     base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
-    shortcode: ${MPESA_SHORTCODE:}       # use your sandbox Lipa Na M-Pesa Online shortcode from Daraja portal (often 174379)
+    shortcode: ${MPESA_SHORTCODE:174379}       # use your sandbox Lipa Na M-Pesa Online shortcode from Daraja portal (often 174379)
     passkey: ${MPESA_PASSKEY:}                 # from Daraja app "Lipa Na M-Pesa Online" > Test credentials
     consumer-key: ${MPESA_CONSUMER_KEY:}       # from your Daraja app
     consumer-secret: ${MPESA_CONSUMER_SECRET:} # from your Daraja app
+    # Set in application-local.yml or env. Example (use your ngrok or domain): https://abc123.ngrok-free.app/api/payments/mpesa/stk-callback
     stk-callback-url: ${MPESA_STK_CALLBACK_URL:}
+    # Example: https://abc123.ngrok-free.app/api/payments/mpesa/b2c-callback
     b2c-callback-url: ${MPESA_B2C_CALLBACK_URL:}
     payout-product-name: ${MPESA_PAYOUT_PRODUCT_NAME:testapi}
     # B2C payouts: initiator name and security credential from M-Pesa B2C API user (portal)
@@ -163,14 +169,17 @@ app:
     b2c-shortcode: ${MPESA_B2C_SHORTCODE:${MPESA_SHORTCODE:174379}}
     timeout: ${MPESA_TIMEOUT_MS:10000}
 
-  # WhatsApp via Twilio: order/payment/shipment notifications. Set enabled=true and Twilio credentials.
+  # WhatsApp via Twilio: order/payment/shipment notifications + incoming webhook for chatbot.
   # Use Twilio Sandbox (https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn) or a WhatsApp Business number.
+  # Webhook: configure in Twilio Console "When a message comes in" → set to: https://YOUR-PUBLIC-HOST/api/webhooks/whatsapp (must be HTTPS and publicly reachable; use ngrok for local).
   whatsapp:
-    enabled: ${WHATSAPP_ENABLED:true}
+    enabled: ${WHATSAPP_ENABLED:false}
     twilio-account-sid: ${TWILIO_ACCOUNT_SID:}
     twilio-auth-token: ${TWILIO_AUTH_TOKEN:}
     # Sender: Sandbox e.g. whatsapp:+14155238886, or your WhatsApp Business number (E.164 with whatsapp: prefix)
     from-number: ${TWILIO_WHATSAPP_FROM:whatsapp:+14155238886}
+    # Optional: public base URL for webhook (for docs/setup). Twilio "When a message comes in" URL = this + /api/webhooks/whatsapp
+    webhook-url: ${WHATSAPP_WEBHOOK_URL:}
   # Storefront URL for WhatsApp chatbot (order links, register link)
   storefront-url: ${STOREFRONT_URL:http://localhost:3000}
 
@@ -187,9 +196,9 @@ app:
 # Cloudflare R2 (S3-compatible) for product images and verification documents
 # Must be top-level "r2:" for R2Config prefix to work.
 r2:
-  enabled: ${R2_ENABLED:true}
-  bucket: ${R2_BUCKET:}
-  endpoint: ${R2_ENDPOINT:}
+  enabled: ${R2_ENABLED:false}
+  bucket: ${R2_BUCKET:biasharahub-product-images}
+  endpoint: ${R2_ENDPOINT:https://03c04814dd2c76d33ab9692b1255838c.r2.cloudflarestorage.com}
   access-key-id: ${R2_ACCESS_KEY_ID:}
   secret-access-key: ${R2_SECRET_ACCESS_KEY:}
   public-url: ${R2_PUBLIC_URL:}

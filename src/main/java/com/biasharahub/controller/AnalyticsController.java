@@ -40,7 +40,14 @@ public class AnalyticsController {
         analytics.put("totalRevenue", totalRevenue);
         analytics.put("pendingOrders", pendingOrders);
         analytics.put("averageOrderValue", avgOrderValue);
-        analytics.put("topProducts", productRepository.findAll().stream().limit(5).toList());
+        analytics.put("topProducts", productRepository.findAll().stream().limit(5)
+                .map(p -> java.util.Map.<String, Object>of(
+                        "id", p.getProductId(),
+                        "name", p.getName() != null ? p.getName() : "",
+                        "quantity", p.getQuantity() != null ? p.getQuantity() : 0,
+                        "price", p.getPrice() != null ? p.getPrice() : java.math.BigDecimal.ZERO
+                ))
+                .toList());
         return ResponseEntity.ok(analytics);
     }
 }
