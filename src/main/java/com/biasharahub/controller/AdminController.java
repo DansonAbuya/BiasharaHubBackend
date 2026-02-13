@@ -15,6 +15,9 @@ import java.util.Map;
  * Platform admin endpoints. Only super_admin can add owners and assistant admins.
  * Owners receive a temporary password by email and can enable/disable 2FA.
  * Assistant admins have 2FA always on and cannot disable it.
+ *
+ * When adding an owner: send X-Tenant-ID (tenant UUID) so the owner is created in that tenant's schema
+ * and the seller's payout details (payoutMethod, payoutDestination) are stored on that tenant for auto-payout on order delivery.
  */
 @RestController
 @RequestMapping("/admin")

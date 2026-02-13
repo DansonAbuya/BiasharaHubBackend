@@ -28,5 +28,12 @@
     <include file="db/changelog/changes/021-add-pricing-and-branding.xml"/>
     <include file="db/changelog/changes/022-create-notifications-table.xml"/>
     <include file="db/changelog/changes/023-add-growth-plan-features.xml"/>
+    <include file="db/changelog/changes/024-add-payout-external-reference.xml"/>
+    <include file="db/changelog/changes/025-tenant-default-payout-destination.xml"/>
+    <include file="db/changelog/changes/026-trust-safety-users-strikes-checklist.xml"/>
+    <include file="db/changelog/changes/027-trust-safety-shipments-delivery-proof.xml"/>
+    <include file="db/changelog/changes/028-trust-safety-disputes.xml"/>
+    <include file="db/changelog/changes/029-courier-services-table.xml"/>
+    <include file="db/changelog/changes/030-courier-provider-integration.xml"/>
 
 </databaseChangeLog>

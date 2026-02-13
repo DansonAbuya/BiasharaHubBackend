@@ -79,6 +79,7 @@ public class AuthService {
     public Optional<LoginResponse> login(LoginRequest request) {
         return userRepository.findByEmail(request.getEmail().toLowerCase())
                 .filter(user -> passwordEncoder.matches(request.getPassword(), user.getPasswordHash()))
+                .filter(user -> user.getAccountStatus() == null || "active".equalsIgnoreCase(user.getAccountStatus()))
                 .map(user -> {
                     if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
                         verificationCodeService.createAndSend2FACode(user);

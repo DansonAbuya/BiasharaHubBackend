@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/2fa/**", "/api/auth/2fa/**", "/auth/change-password", "/api/auth/change-password").authenticated()
                         // Public storefront (home/marketplace): list shops, categories, products and single product — no auth
                         .requestMatchers(HttpMethod.GET, "/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/courier-services").permitAll()
                         .requestMatchers("/auth/**", "/api/auth/**", "/public/**", "/static/**", "/favicon.ico", "/favicon.png", "/logo.png", "/error",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/webhooks/**").permitAll()

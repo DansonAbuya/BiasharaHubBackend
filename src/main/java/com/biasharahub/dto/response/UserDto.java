@@ -27,4 +27,8 @@ public class UserDto {
     private String sellerTier;
     /** Optional: tier the owner is applying for (tier1/tier2/tier3). Set at onboarding. */
     private String applyingForTier;
+    /** Trust & Safety: strike count (3+=suspended, 5+=banned). */
+    private Integer strikeCount;
+    /** Trust & Safety: active, suspended, banned. */
+    private String accountStatus;
 }

@@ -1,10 +1,13 @@
 package com.biasharahub.service;
 
+import com.biasharahub.config.TenantContext;
 import com.biasharahub.dto.request.AddAssistantAdminRequest;
 import com.biasharahub.dto.request.AddOwnerRequest;
 import com.biasharahub.dto.request.AddStaffRequest;
 import com.biasharahub.dto.response.UserDto;
+import com.biasharahub.entity.Tenant;
 import com.biasharahub.entity.User;
+import com.biasharahub.repository.TenantRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,12 +24,18 @@ public class UserService {
     private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
     private static final int TEMP_PASSWORD_LENGTH = 14;
 
+    private static final String PAYOUT_METHOD_MPESA = "MPESA";
+    private static final String PAYOUT_METHOD_BANK = "BANK_TRANSFER";
+
     private final UserRepository userRepository;
+    private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final MailService mailService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, MailService mailService) {
+    public UserService(UserRepository userRepository, TenantRepository tenantRepository,
+                       PasswordEncoder passwordEncoder, MailService mailService) {
         this.userRepository = userRepository;
+        this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailService = mailService;
     }
@@ -44,6 +53,16 @@ public class UserService {
         if (!"tier1".equals(t) && !"tier2".equals(t) && !"tier3".equals(t)) {
             throw new IllegalArgumentException("Applying for tier is required and must be tier1, tier2, or tier3");
         }
+        String payoutMethod = normalisePayoutMethod(request.getPayoutMethod());
+        if (request.getPayoutDestination() == null || request.getPayoutDestination().isBlank()) {
+            throw new IllegalArgumentException("Payout destination is required (e.g. M-Pesa number or bank account)");
+        }
+
+        Tenant tenant = resolveCurrentTenant();
+        if (tenant == null) {
+            throw new IllegalStateException("Tenant context required when adding an owner. Send X-Tenant-ID header.");
+        }
+
         String tempPassword = generateTemporaryPassword();
         User owner = User.builder()
                 .email(request.getEmail().toLowerCase())
@@ -57,8 +76,25 @@ public class UserService {
         owner = userRepository.save(owner);
         owner.setBusinessId(owner.getUserId());
         owner = userRepository.save(owner);
+
+        tenant.setDefaultPayoutMethod(payoutMethod);
+        tenant.setDefaultPayoutDestination(request.getPayoutDestination().trim());
+        tenantRepository.save(tenant);
+
         mailService.sendWelcomeOwner(owner.getEmail(), owner.getName(), owner.getBusinessName(), tempPassword);
         return toUserDto(owner);
+    }
+
+    private Tenant resolveCurrentTenant() {
+        String schema = TenantContext.getTenantSchema();
+        if (schema == null || schema.isBlank()) return null;
+        return tenantRepository.findBySchemaName(schema).orElse(null);
+    }
+
+    private static String normalisePayoutMethod(String method) {
+        if (method == null) return PAYOUT_METHOD_BANK;
+        String m = method.trim().toUpperCase();
+        return PAYOUT_METHOD_MPESA.equals(m) ? PAYOUT_METHOD_MPESA : PAYOUT_METHOD_BANK;
     }
 
     /**

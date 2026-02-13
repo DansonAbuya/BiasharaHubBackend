@@ -30,4 +30,9 @@ public class ShipmentDto {
     private Instant escrowReleasedAt;
     // For Phase 1 MVP we expose OTP so customer can see it in-app.
     private String otpCode;
+    /** Trust & Safety: delivery proof (signature/photo URLs, GPS). */
+    private String deliverySignatureUrl;
+    private String deliveryPhotoUrl;
+    private java.math.BigDecimal deliveryGpsLat;
+    private java.math.BigDecimal deliveryGpsLng;
 }

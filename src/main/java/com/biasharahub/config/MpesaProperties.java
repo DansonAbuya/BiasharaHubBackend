@@ -18,6 +18,12 @@ public class MpesaProperties {
     private String stkCallbackUrl;
     private String b2cCallbackUrl;
     private String payoutProductName;
+    /** B2C initiator name (API user with B2C role in M-Pesa portal). */
+    private String b2cInitiatorName;
+    /** B2C security credential (encrypted initiator password from M-Pesa portal). */
+    private String b2cSecurityCredential;
+    /** B2C shortcode (organization paybill/till); often same as shortcode. */
+    private String b2cShortcode;
     private int timeout;
 }
 

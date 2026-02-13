@@ -1,14 +1,22 @@
 package com.biasharahub.controller;
 
+import com.biasharahub.courier.CourierIntegrationException;
+import com.biasharahub.courier.CourierIntegrationService;
+import com.biasharahub.courier.CreateShipmentResult;
+import com.biasharahub.courier.TrackingEvent;
+import com.biasharahub.courier.TrackingInfo;
 import com.biasharahub.dto.response.ShipmentDto;
+import com.biasharahub.dto.response.TrackingInfoDto;
 import com.biasharahub.entity.Order;
 import com.biasharahub.entity.Shipment;
 import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.ShipmentRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.InAppNotificationService;
+import com.biasharahub.service.PayoutService;
 import com.biasharahub.service.WhatsAppNotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -22,12 +30,15 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/shipments")
 @RequiredArgsConstructor
+@Slf4j
 public class ShipmentController {
 
     private final ShipmentRepository shipmentRepository;
     private final OrderRepository orderRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final InAppNotificationService inAppNotificationService;
+    private final PayoutService payoutService;
+    private final CourierIntegrationService courierIntegrationService;
 
     @GetMapping
     public ResponseEntity<List<ShipmentDto>> listShipments(@AuthenticationPrincipal AuthenticatedUser user) {
@@ -141,12 +152,35 @@ public class ShipmentController {
                     if (shipment.getDeliveredAt() == null) {
                         shipment.setDeliveredAt(now);
                     }
+                    // Trust & Safety: optional delivery proof (signature, photo, GPS)
+                    if (body != null) {
+                        if (body.get("deliverySignatureUrl") != null && !body.get("deliverySignatureUrl").isBlank()) {
+                            shipment.setDeliverySignatureUrl(body.get("deliverySignatureUrl").trim());
+                        }
+                        if (body.get("deliveryPhotoUrl") != null && !body.get("deliveryPhotoUrl").isBlank()) {
+                            shipment.setDeliveryPhotoUrl(body.get("deliveryPhotoUrl").trim());
+                        }
+                        try {
+                            if (body.get("deliveryGpsLat") != null && !body.get("deliveryGpsLat").isBlank()) {
+                                shipment.setDeliveryGpsLat(new java.math.BigDecimal(body.get("deliveryGpsLat").trim()));
+                            }
+                            if (body.get("deliveryGpsLng") != null && !body.get("deliveryGpsLng").isBlank()) {
+                                shipment.setDeliveryGpsLng(new java.math.BigDecimal(body.get("deliveryGpsLng").trim()));
+                            }
+                        } catch (NumberFormatException ignored) { }
+                    }
 
                     // Simple escrow release: mark payout released on the order
                     Order order = shipment.getOrder();
                     if (order.getPayoutReleasedAt() == null) {
                         order.setPayoutReleasedAt(now);
                         orderRepository.save(order);
+                        // Auto-transfer owner's payment to their default payout destination (e.g. M-Pesa)
+                        try {
+                            payoutService.triggerAutoPayoutForOrder(order);
+                        } catch (Exception e) {
+                            log.warn("Auto-payout for order {} failed (escrow still released): {}", order.getOrderId(), e.getMessage());
+                        }
                     }
                     shipment.setEscrowReleasedAt(now);
 
@@ -171,6 +205,70 @@ public class ShipmentController {
                 .orElse(ResponseEntity.status(404).<ShipmentDto>build());
     }
 
+    /**
+     * Create shipment with integrated courier provider (DHL, FedEx, Sendy, REST).
+     * Body: { "courierServiceCode": "dhl" }. Updates shipment with tracking number and carrier.
+     */
+    @PostMapping("/{id}/create-with-provider")
+    public ResponseEntity<?> createWithProvider(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body) {
+        if (user == null) return ResponseEntity.status(401).build();
+        String code = body != null ? body.get("courierServiceCode") : null;
+        if (code == null || code.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "courierServiceCode is required"));
+        }
+        try {
+            CreateShipmentResult result = courierIntegrationService.createShipmentWithProvider(id, code.trim());
+            if (result == null) {
+                return ResponseEntity.ok(Map.of("message", "Manual courier: enter tracking number in shipment details."));
+            }
+            Shipment s = shipmentRepository.findById(id).orElseThrow();
+            return ResponseEntity.ok(Map.of(
+                    "shipment", toDto(s),
+                    "trackingNumber", result.getTrackingNumber(),
+                    "labelUrl", result.getLabelUrl() != null ? result.getLabelUrl() : ""));
+        } catch (CourierIntegrationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Get tracking info from courier provider (if integrated). Returns null fields for MANUAL.
+     */
+    @GetMapping("/{id}/tracking")
+    public ResponseEntity<TrackingInfoDto> getTracking(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id) {
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            TrackingInfo info = courierIntegrationService.getTracking(id);
+            if (info == null) {
+                return ResponseEntity.ok(TrackingInfoDto.builder().build());
+            }
+            TrackingInfoDto dto = TrackingInfoDto.builder()
+                    .trackingNumber(info.getTrackingNumber())
+                    .status(info.getStatus())
+                    .statusDescription(info.getStatusDescription())
+                    .estimatedDelivery(info.getEstimatedDelivery())
+                    .events(info.getEvents() != null ? info.getEvents().stream()
+                            .map(e -> TrackingInfoDto.TrackingEventDto.builder()
+                                    .timestamp(e.getTimestamp())
+                                    .status(e.getStatus())
+                                    .description(e.getDescription())
+                                    .location(e.getLocation())
+                                    .build())
+                            .toList() : null)
+                    .build();
+            return ResponseEntity.ok(dto);
+        } catch (CourierIntegrationException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     private ShipmentDto toDto(Shipment s) {
         return ShipmentDto.builder()
                 .id(s.getShipmentId())
@@ -189,6 +287,10 @@ public class ShipmentController {
                 .actualDelivery(s.getDeliveredAt())
                 .escrowReleasedAt(s.getEscrowReleasedAt())
                 .otpCode(s.getOtpCode())
+                .deliverySignatureUrl(s.getDeliverySignatureUrl())
+                .deliveryPhotoUrl(s.getDeliveryPhotoUrl())
+                .deliveryGpsLat(s.getDeliveryGpsLat())
+                .deliveryGpsLng(s.getDeliveryGpsLng())
                 .build();
     }
 

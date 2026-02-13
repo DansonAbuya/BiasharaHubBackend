@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="025-tenant-default-payout-destination" author="biasharahub">
+        <addColumn schemaName="public" tableName="tenants">
+            <column name="default_payout_method" type="VARCHAR(32)"/>
+            <column name="default_payout_destination" type="VARCHAR(1024)"/>
+        </addColumn>
+        <comment>Default payout method and destination (e.g. M-Pesa phone) for auto-payout on order delivery confirmation</comment>
+    </changeSet>
+
+</databaseChangeLog>

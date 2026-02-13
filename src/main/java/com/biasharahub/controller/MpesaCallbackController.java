@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.biasharahub.entity.Payment;
 import com.biasharahub.repository.PaymentRepository;
 import com.biasharahub.service.OrderEventPublisher;
+import com.biasharahub.service.PayoutService;
 import com.biasharahub.service.TenantWalletService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class MpesaCallbackController {
     private final PaymentRepository paymentRepository;
     private final TenantWalletService tenantWalletService;
     private final OrderEventPublisher orderEventPublisher;
+    private final PayoutService payoutService;
 
     @PostMapping("/stk-callback")
     @Transactional
@@ -105,6 +107,27 @@ public class MpesaCallbackController {
                 .orElse(null);
     }
 
+    /**
+     * Receives M-Pesa B2C result callback. Updates payout status by ConversationID (external_reference).
+     */
+    @PostMapping("/b2c-callback")
+    @Transactional
+    public ResponseEntity<B2CResultResponse> handleB2CCallback(@RequestBody B2CResultEnvelope envelope) {
+        if (envelope == null || envelope.getResult() == null) {
+            return ResponseEntity.ok(new B2CResultResponse(0, "Accepted"));
+        }
+        B2CResult result = envelope.getResult();
+        String conversationId = result.getConversationID() != null ? result.getConversationID() : result.getOriginatorConversationID();
+        int resultCode = result.getResultCode() != null ? result.getResultCode() : -1;
+        String resultDesc = result.getResultDesc();
+        log.info("Received M-Pesa B2C callback: conversationId={}, resultCode={}, resultDesc={}",
+                conversationId, resultCode, resultDesc);
+
+        payoutService.handleB2CResult(conversationId, resultCode, resultDesc != null ? resultDesc : "");
+
+        return ResponseEntity.ok(new B2CResultResponse(0, "Accepted"));
+    }
+
     // --- Payload classes matching M-Pesa STK callback JSON ---
 
     @Data
@@ -155,6 +178,46 @@ public class MpesaCallbackController {
 
         @JsonProperty("Value")
         private Object value;
+    }
+
+    // --- B2C result callback (Daraja sends Result with ResultCode, ConversationID, etc.) ---
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class B2CResultEnvelope {
+        @JsonProperty("Result")
+        private B2CResult result;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class B2CResult {
+        @JsonProperty("ResultType")
+        private Integer resultType;
+        @JsonProperty("ResultCode")
+        private Integer resultCode;
+        @JsonProperty("ResultDesc")
+        private String resultDesc;
+        @JsonProperty("OriginatorConversationID")
+        private String originatorConversationID;
+        @JsonProperty("ConversationID")
+        private String conversationID;
+        @JsonProperty("TransactionID")
+        private String transactionID;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class B2CResultResponse {
+        @JsonProperty("ResultCode")
+        private final int resultCode;
+        @JsonProperty("ResultDesc")
+        private final String resultDesc;
+
+        public B2CResultResponse(int resultCode, String resultDesc) {
+            this.resultCode = resultCode;
+            this.resultDesc = resultDesc;
+        }
     }
 }
 

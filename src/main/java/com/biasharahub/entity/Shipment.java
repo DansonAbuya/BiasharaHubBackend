@@ -76,6 +76,19 @@ public class Shipment {
     @Column(name = "escrow_released_at")
     private Instant escrowReleasedAt;
 
+    /** Trust & Safety: delivery proof (signature image URL, photo URL, GPS). */
+    @Column(name = "delivery_signature_url", length = 1024)
+    private String deliverySignatureUrl;
+
+    @Column(name = "delivery_photo_url", length = 1024)
+    private String deliveryPhotoUrl;
+
+    @Column(name = "delivery_gps_lat", precision = 12, scale = 8)
+    private java.math.BigDecimal deliveryGpsLat;
+
+    @Column(name = "delivery_gps_lng", precision = 12, scale = 8)
+    private java.math.BigDecimal deliveryGpsLng;
+
     @Column(name = "created_at")
     private Instant createdAt;
 

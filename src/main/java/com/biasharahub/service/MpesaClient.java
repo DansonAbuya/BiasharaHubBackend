@@ -98,6 +98,57 @@ public class MpesaClient {
         return "STUB-" + Instant.now().toEpochMilli();
     }
 
+    /**
+     * Initiate B2C (Business to Customer) payout to an M-Pesa phone number.
+     *
+     * @param recipientPhone M-Pesa number (2547XXXXXXXX or 07XXXXXXXX)
+     * @param amount         Amount in KES
+     * @param originatorConversationId Unique reference (e.g. payout ID) for callback matching
+     * @param remarks        Description (max 100 chars)
+     * @return M-Pesa ConversationID if successful, or null if B2C not configured or request failed
+     */
+    public String initiateB2C(String recipientPhone, BigDecimal amount, String originatorConversationId, String remarks) {
+        if (!isEnabled() || props.getB2cInitiatorName() == null || props.getB2cInitiatorName().isBlank()
+                || props.getB2cSecurityCredential() == null || props.getB2cSecurityCredential().isBlank()) {
+            log.info("M-Pesa B2C not configured; skipping payout");
+            return null;
+        }
+        try {
+            String token = getAccessToken();
+            String url = props.getBaseUrl() + "/mpesa/b2c/v1/paymentrequest";
+
+            B2CRequest body = new B2CRequest();
+            body.setInitiatorName(props.getB2cInitiatorName());
+            body.setSecurityCredential(props.getB2cSecurityCredential());
+            body.setCommandID("BusinessPayment");
+            body.setAmount(amount.setScale(0, BigDecimal.ROUND_HALF_UP).intValue());
+            body.setPartyA(props.getB2cShortcode() != null ? props.getB2cShortcode() : props.getShortcode());
+            body.setPartyB(normaliseMsisdn(recipientPhone));
+            body.setRemarks(remarks != null && remarks.length() > 100 ? remarks.substring(0, 100) : remarks);
+            body.setQueueTimeOutURL(props.getB2cCallbackUrl());
+            body.setResultURL(props.getB2cCallbackUrl());
+            body.setOccasion("Payout");
+            body.setOriginatorConversationID(originatorConversationId != null ? originatorConversationId : "PAY-" + Instant.now().toEpochMilli());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+
+            HttpEntity<B2CRequest> entity = new HttpEntity<>(body, headers);
+            ResponseEntity<B2CResponse> response = restTemplate.exchange(url, HttpMethod.POST, entity, B2CResponse.class);
+
+            B2CResponse rsp = response.getBody();
+            if (response.getStatusCode().is2xxSuccessful() && rsp != null && "0".equals(rsp.getResponseCode())) {
+                log.info("M-Pesa B2C initiated: conversationId={}", rsp.getConversationID());
+                return rsp.getConversationID();
+            }
+            log.warn("M-Pesa B2C failed: status={}, body={}", response.getStatusCode(), rsp);
+        } catch (Exception e) {
+            log.error("Error calling M-Pesa B2C API: {}", e.getMessage());
+        }
+        return null;
+    }
+
     private String getAccessToken() {
         if (cachedToken != null && cachedTokenExpiresAt != null &&
                 Instant.now().isBefore(cachedTokenExpiresAt.minusSeconds(30))) {
@@ -212,6 +263,45 @@ public class MpesaClient {
 
         @JsonProperty("CustomerMessage")
         private String customerMessage;
+    }
+
+    @Data
+    private static class B2CRequest {
+        @JsonProperty("InitiatorName")
+        private String initiatorName;
+        @JsonProperty("SecurityCredential")
+        private String securityCredential;
+        @JsonProperty("CommandID")
+        private String commandID;
+        @JsonProperty("Amount")
+        private Integer amount;
+        @JsonProperty("PartyA")
+        private String partyA;
+        @JsonProperty("PartyB")
+        private String partyB;
+        @JsonProperty("Remarks")
+        private String remarks;
+        @JsonProperty("QueueTimeOutURL")
+        private String queueTimeOutURL;
+        @JsonProperty("ResultURL")
+        private String resultURL;
+        @JsonProperty("Occasion")
+        private String occasion;
+        @JsonProperty("OriginatorConversationID")
+        private String originatorConversationID;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class B2CResponse {
+        @JsonProperty("ConversationID")
+        private String conversationID;
+        @JsonProperty("OriginatorConversationID")
+        private String originatorConversationID;
+        @JsonProperty("ResponseCode")
+        private String responseCode;
+        @JsonProperty("ResponseDescription")
+        private String responseDescription;
     }
 }
 
