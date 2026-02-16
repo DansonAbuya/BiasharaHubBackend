@@ -21,9 +21,11 @@ pipeline {
             }
         }
 
+        // Test stage uses the UAT test DB and Redis. In Jenkins job config set:
+        // DB_URL, DB_USERNAME, DB_PASSWORD (UAT PostgreSQL), REDIS_HOST, REDIS_PORT (UAT Redis).
         stage('Test') {
             steps {
-                sh 'mvn test'
+                sh 'mvn test -Dspring.profiles.active=test'
             }
         }
 
