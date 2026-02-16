@@ -3,7 +3,7 @@
 # Override any value with environment variables. Set ENCRYPTION_SECRET and JWT_SECRET in env.
 
 server:
-  port: ${SERVER_PORT:5000}
+  port: ${SERVER_PORT}
 
 spring:
   jpa:
