@@ -3,6 +3,7 @@ package com.biasharahub.config;
 import com.biasharahub.security.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -30,6 +31,10 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+
+    /** Comma-separated allowed origins for CORS (e.g. from APP_CORS_ALLOWED_ORIGINS). If empty, only localhost is allowed. */
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOriginsConfig;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
@@ -78,12 +83,23 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
+        List<String> origins = new java.util.ArrayList<>(List.of(
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
                 "https://localhost:3000",
-                "https://127.0.0.1:3000"
+                "https://127.0.0.1:3000",
+                "https://biasharahub-app-test.sysnovatechnologies.com",
+                "https://biasharahub-app.sysnovatechnologies.com"
         ));
+        if (allowedOriginsConfig != null && !allowedOriginsConfig.isBlank()) {
+            for (String origin : allowedOriginsConfig.split(",\\s*")) {
+                String trimmed = origin.trim();
+                if (!trimmed.isEmpty() && !origins.contains(trimmed)) {
+                    origins.add(trimmed);
+                }
+            }
+        }
+        config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

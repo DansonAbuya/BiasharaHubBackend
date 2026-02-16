@@ -102,6 +102,7 @@ jwt:
 
 # OAuth2 2FA
 app:
+  # For test/prod profiles see application-test.yml and application-prod.yml (UAT/prod URLs).
   frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
   oauth2:
     backend-base-url: ${OAUTH2_BACKEND_BASE_URL:http://localhost:5050/api}
@@ -122,9 +123,9 @@ app:
       from: ${MAIL_FROM:}
       refresh-interval-ms: 3000000   # 50 min (token ~1h expiry)
 
-  # CORS (adjust for production)
+  # CORS: test/prod profiles default to UAT/prod frontend URLs (see application-test.yml / application-prod.yml).
   cors:
-    allowed-origins: http://localhost:3000,http://127.0.0.1:3000databasechangeloglock
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
 
   # Kafka (event publishing for orders/payments). Set KAFKA_ENABLED=true and KAFKA_BOOTSTRAP_SERVERS to use.
   kafka:
@@ -181,6 +182,7 @@ app:
     # Optional: public base URL for webhook (for docs/setup). Twilio "When a message comes in" URL = this + /api/webhooks/whatsapp
     webhook-url: ${WHATSAPP_WEBHOOK_URL:}
   # Storefront URL for WhatsApp chatbot (order links, register link)
+  # test/prod profiles: biasharahub-app-test / biasharahub-app (see application-test.yml / application-prod.yml).
   storefront-url: ${STOREFRONT_URL:http://localhost:3000}
 
   # Courier provider API keys (never commit secrets; use env COURIER_<CODE>_API_KEY or app.courier.api-keys.<code>)

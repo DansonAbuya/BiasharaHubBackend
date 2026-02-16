@@ -1,0 +1,24 @@
+# Production profile – biasharahub-app / biasharahub-api
+# Use with SPRING_PROFILES_ACTIVE=prod (e.g. Elastic Beanstalk production).
+# Override any value with environment variables. Set ENCRYPTION_SECRET and JWT_SECRET in env.
+
+server:
+  port: ${SERVER_PORT:5000}
+
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    root: WARN
+    com.biasharahub: INFO
+
+app:
+  frontend-url: ${APP_FRONTEND_URL:https://biasharahub-app.sysnovatechnologies.com}
+  oauth2:
+    backend-base-url: ${OAUTH2_BACKEND_BASE_URL:https://biasharahub-api.sysnovatechnologies.com/api}
+    frontend-redirect-uri: ${OAUTH2_FRONTEND_REDIRECT_URI:https://biasharahub-app.sysnovatechnologies.com/auth/callback}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:https://biasharahub-app.sysnovatechnologies.com}
+  storefront-url: ${STOREFRONT_URL:https://biasharahub-app.sysnovatechnologies.com}

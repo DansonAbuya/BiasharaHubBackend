@@ -4,7 +4,7 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
 
 **@ [Sysnova Technologies](https://sysnovatechnologies.com).**
 
-**This repository is backend-only.** The frontend lives in a separate project (e.g. **BisharaHubFrontend**) and must run on its own. The two interact **only via HTTP API calls**: frontend at `http://localhost:3000` (or your dev URL) calls this API at `http://localhost:5050/api`. CORS is configured to allow the frontend origin.
+**This repository is backend-only.** The frontend lives in a separate project (e.g. **BisharaHubFrontend**) and must run on its own. The two interact **only via HTTP API calls**: frontend calls this API (local: `http://localhost:5050/api`; UAT: `https://biasharahub-api-test.sysnovatechnologies.com/api`; prod: `https://biasharahub-api.sysnovatechnologies.com/api`). CORS allows localhost and the UAT/prod frontend origins.
 
 ## Tech Stack
 
@@ -52,7 +52,7 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
    mvn spring-boot:run
    ```
 
-6. **API base URL:** `http://localhost:5050/api`
+6. **API base URL:** Local `http://localhost:5050/api`; UAT `https://biasharahub-api-test.sysnovatechnologies.com/api`; prod `https://biasharahub-api.sysnovatechnologies.com/api`
 
 ## Multi-Tenancy (Schema per Tenant)
 
@@ -169,7 +169,7 @@ When enabled, the app publishes to Kafka when an order is created and when a pay
 1. In [Google Cloud Console](https://console.cloud.google.com/) create (or use) a project and enable the **Google+ API** (or **Google Identity**).
 2. Under **APIs & Services → Credentials**, create an **OAuth 2.0 Client ID** (type **Web application**).
 3. Set **Authorized redirect URIs** to your backend callback URL, e.g.:
-   - Local: `http://localhost:5050/api/auth/oauth2/callback`
+   - Local: `http://localhost:5050/api/auth/oauth2/callback`; UAT: `https://biasharahub-api-test.sysnovatechnologies.com/api/auth/oauth2/callback`; prod: `https://biasharahub-api.sysnovatechnologies.com/api/auth/oauth2/callback`
    - Production: `https://your-api.example.com/api/auth/oauth2/callback`
 4. Set environment variables (or `application.yml`):
 
@@ -177,8 +177,8 @@ When enabled, the app publishes to Kafka when an order is created and when a pay
 |----------|-------------|
 | `GOOGLE_CLIENT_ID` | OAuth 2.0 client ID from Google |
 | `GOOGLE_CLIENT_SECRET` | OAuth 2.0 client secret |
-| `OAUTH2_BACKEND_BASE_URL` | Backend base URL (default `http://localhost:5050/api`) |
-| `OAUTH2_FRONTEND_REDIRECT_URI` | Frontend URL after OAuth (default `http://localhost:3000/auth/callback`) |
+| `OAUTH2_BACKEND_BASE_URL` | Backend base URL (local default `http://localhost:5050/api`; test/prod use application-test.yml / application-prod.yml) |
+| `OAUTH2_FRONTEND_REDIRECT_URI` | Frontend URL after OAuth (local default `http://localhost:3000/auth/callback`; UAT/prod in profile yml) |
 
 **Example (PowerShell):**
 ```powershell
