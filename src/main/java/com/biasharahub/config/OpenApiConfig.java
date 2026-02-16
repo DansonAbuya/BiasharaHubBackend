@@ -19,7 +19,7 @@ public class OpenApiConfig {
 
     @Bean
     public OpenAPI customOpenAPI() {
-        // Use resolved port so Swagger UI displays e.g. http://localhost:5050/api
+        // Use resolved port so Swagger UI displays correct API URL (local: 5050; UAT/prod: use backend URL)
         // instead of http://localhost:${SERVER_PORT:5050}/api
         String serverUrl = "http://localhost:" + serverPort + contextPath;
         return new OpenAPI()
