@@ -128,7 +128,7 @@ app:
 
   # Kafka (event publishing for orders/payments). Set KAFKA_ENABLED=true and KAFKA_BOOTSTRAP_SERVERS to use.
   kafka:
-    enabled: ${KAFKA_ENABLED:true}
+    enabled: ${KAFKA_ENABLED:false}
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     topics:
       order-created: ${KAFKA_TOPIC_ORDER_CREATED:orders.created}
