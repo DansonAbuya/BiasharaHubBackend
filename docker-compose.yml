@@ -1,0 +1,48 @@
+# Local dev: backend + PostgreSQL + Redis
+# Run: docker-compose up -d
+# API: http://localhost:5050/api
+
+services:
+  backend:
+    build: .
+    ports:
+      - "5050:5050"
+    environment:
+      SPRING_PROFILES_ACTIVE: ""
+      SERVER_PORT: "5050"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/biasharahub
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      APP_FRONTEND_URL: http://localhost:3000
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: biasharahub
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
