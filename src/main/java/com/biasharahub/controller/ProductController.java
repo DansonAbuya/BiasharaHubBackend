@@ -13,6 +13,7 @@ import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.R2StorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -38,23 +39,33 @@ public class ProductController {
     private final UserRepository userRepository;
     private final Optional<R2StorageService> r2StorageService;
 
-    /** List businesses (owners) for customer filter dropdown. No auth required. */
+    /** List shops (verified owners’ businesses) for marketplace. Each seller has one shop; only verified shops appear. No auth required. */
     @GetMapping("/businesses")
-    public ResponseEntity<List<BusinessDto>> listBusinesses() {
-        List<BusinessDto> businesses = userRepository.findByRoleIgnoreCaseAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner")
+    @Cacheable(
+            cacheNames = "marketplaceBusinesses",
+            key = "T(com.biasharahub.config.TenantContext).getTenantSchema()"
+    )
+    public List<BusinessDto> listBusinesses() {
+        List<BusinessDto> businesses = userRepository.findByRoleIgnoreCaseAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified")
                 .stream()
+                .filter(u -> u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus()))
                 .map(u -> BusinessDto.builder()
                         .id(u.getBusinessId())
                         .name(u.getBusinessName() != null ? u.getBusinessName() : "—")
                         .ownerName(u.getName() != null ? u.getName() : u.getEmail())
+                        .sellerTier(u.getSellerTier() != null ? u.getSellerTier() : "tier1")
                         .build())
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(businesses);
+        return businesses;
     }
 
     /** List product categories for frontend dropdown (e.g. when uploading/creating a product). No auth required. */
     @GetMapping("/categories")
-    public ResponseEntity<List<ProductCategoryDto>> listCategories() {
+    @Cacheable(
+            cacheNames = "productCategories",
+            key = "T(com.biasharahub.config.TenantContext).getTenantSchema()"
+    )
+    public List<ProductCategoryDto> listCategories() {
         List<ProductCategoryDto> categories = productCategoryRepository.findAllByOrderByDisplayOrderAscNameAsc()
                 .stream()
                 .map(c -> ProductCategoryDto.builder()
@@ -63,29 +74,44 @@ public class ProductController {
                         .displayOrder(c.getDisplayOrder())
                         .build())
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(categories);
+        return categories;
     }
 
+    /**
+     * List products.
+     * - Owner / staff (Seller Center): only products belonging to their business (any moderation status).
+     * - Customers / anonymous: only verified businesses and approved products; optional filter by businessId (shop) so customers see all products for the shop they select.
+     */
     @GetMapping
-    public ResponseEntity<List<ProductDto>> listProducts(
+    @Cacheable(
+            cacheNames = "publicProducts",
+            key = "T(com.biasharahub.config.TenantContext).getTenantSchema() + '|' + T(java.util.Objects).toString(#category) + '|' + T(java.util.Objects).toString(#businessId) + '|' + T(java.util.Objects).toString(#businessName) + '|' + T(java.util.Objects).toString(#ownerId)",
+            condition = "#currentUser == null || (#currentUser.role() != null && #currentUser.role().toLowerCase() == 'customer')"
+    )
+    public List<ProductDto> listProducts(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) UUID businessId,
             @RequestParam(required = false) String businessName,
             @RequestParam(required = false) UUID ownerId,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         List<Product> products;
+        Set<UUID> businessIds;
+
         if (isOwnerOrStaff(currentUser)) {
-            UUID authBusinessId = getBusinessId(currentUser);
-            if (authBusinessId == null) {
+            // Seller Center: owner/staff see only their business's products (including pending/rejected)
+            UUID myBusinessId = getBusinessId(currentUser);
+            if (myBusinessId == null) {
                 products = List.of();
             } else {
+                businessIds = Set.of(myBusinessId);
                 products = category != null && !category.isBlank()
-                        ? productRepository.findByBusinessIdAndCategory(authBusinessId, category)
-                        : productRepository.findByBusinessId(authBusinessId);
+                        ? productRepository.findByBusinessIdInAndCategory(businessIds, category)
+                        : productRepository.findByBusinessIdIn(businessIds);
+                // No moderation filter — they see all their products in Seller Center
             }
         } else {
-            // Customer (or unauthenticated): optional filter by category, business, or owner
-            Set<UUID> businessIds = resolveBusinessFilter(businessId, businessName, ownerId);
+            // Customers / anonymous: apply request filters, then restrict to verified + approved (storefront)
+            businessIds = resolveBusinessFilter(businessId, businessName, ownerId);
             if (businessIds != null && businessIds.isEmpty()) {
                 products = List.of();
             } else if (businessIds != null) {
@@ -97,8 +123,17 @@ public class ProductController {
                         ? productRepository.findByCategory(category)
                         : productRepository.findAllWithImages();
             }
+            Set<UUID> verifiedBusinessIds = userRepository.findByRoleIgnoreCaseAndVerificationStatusOrderByCreatedAtAsc("owner", "verified")
+                    .stream()
+                    .filter(u -> u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus()))
+                    .map(User::getUserId)
+                    .collect(Collectors.toSet());
+            products = products.stream()
+                    .filter(p -> p.getBusinessId() != null && verifiedBusinessIds.contains(p.getBusinessId())
+                            && "approved".equalsIgnoreCase(p.getModerationStatus()))
+                    .toList();
         }
-        return ResponseEntity.ok(products.stream().map(this::toDto).collect(Collectors.toList()));
+        return products.stream().map(this::toDto).collect(Collectors.toList());
     }
 
     /** Resolve businessId, businessName, or ownerId to a set of business IDs for customer filter. Returns null if no filter. */
@@ -124,24 +159,58 @@ public class ProductController {
         return null;
     }
 
+    /**
+     * Get single product.
+     * - Owner / staff: only products belonging to their business (any moderation status, for Seller Center).
+     * - Customers / anonymous: only products visible on storefront (verified business, approved).
+     */
     @GetMapping("/{id}")
     public ResponseEntity<ProductDto> getProduct(
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         return productRepository.findByProductIdWithImages(id)
                 .filter(product -> canAccessProduct(product, currentUser))
+                .filter(product -> allowViewProduct(product, currentUser))
                 .map(p -> ResponseEntity.ok(toDto(p)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /** Owner/staff: only their business. Customer/anonymous: only storefront-visible (verified + approved). */
+    private boolean allowViewProduct(Product product, AuthenticatedUser currentUser) {
+        if (currentUser == null) {
+            return isProductVisibleOnStorefront(product);
+        }
+        if (isOwnerOrStaff(currentUser)) {
+            return canAccessProduct(product, currentUser); // already checked above; allows their business only
+        }
+        return isProductVisibleOnStorefront(product); // customer: only approved from verified shops
+    }
+
+    /** True if product is from a verified business and approved (same rules as listProducts for public storefront). */
+    private boolean isProductVisibleOnStorefront(Product product) {
+        if (product.getBusinessId() == null || !"approved".equalsIgnoreCase(product.getModerationStatus())) {
+            return false;
+        }
+        Set<UUID> verifiedBusinessIds = userRepository.findByRoleIgnoreCaseAndVerificationStatusOrderByCreatedAtAsc("owner", "verified")
+                .stream()
+                .map(User::getUserId)
+                .collect(Collectors.toSet());
+        return verifiedBusinessIds.contains(product.getBusinessId());
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
-    public ResponseEntity<ProductDto> createProduct(
+    public ResponseEntity<?> createProduct(
             @RequestBody ProductDto dto,
             @AuthenticationPrincipal AuthenticatedUser currentUser) {
         UUID businessId = getBusinessId(currentUser);
         if (businessId == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        User owner = userRepository.findById(businessId).orElse(null);
+        if (owner == null || !"verified".equalsIgnoreCase(owner.getVerificationStatus())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Business must be verified before adding products. Submit documents in Verification and wait for admin approval."));
         }
         Product product = Product.builder()
                 .name(dto.getName())
@@ -271,6 +340,7 @@ public class ProductController {
                 .image(mainImage)
                 .images(images)
                 .businessId(p.getBusinessId() != null ? p.getBusinessId().toString() : null)
+                .moderationStatus(p.getModerationStatus())
                 .build();
     }
 }

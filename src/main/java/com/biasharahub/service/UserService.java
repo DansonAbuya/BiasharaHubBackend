@@ -1,10 +1,14 @@
 package com.biasharahub.service;
 
+import com.biasharahub.config.TenantContext;
 import com.biasharahub.dto.request.AddAssistantAdminRequest;
+import com.biasharahub.dto.request.AddCourierRequest;
 import com.biasharahub.dto.request.AddOwnerRequest;
 import com.biasharahub.dto.request.AddStaffRequest;
 import com.biasharahub.dto.response.UserDto;
+import com.biasharahub.entity.Tenant;
 import com.biasharahub.entity.User;
+import com.biasharahub.repository.TenantRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,12 +25,18 @@ public class UserService {
     private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
     private static final int TEMP_PASSWORD_LENGTH = 14;
 
+    private static final String PAYOUT_METHOD_MPESA = "MPESA";
+    private static final String PAYOUT_METHOD_BANK = "BANK_TRANSFER";
+
     private final UserRepository userRepository;
+    private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final MailService mailService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, MailService mailService) {
+    public UserService(UserRepository userRepository, TenantRepository tenantRepository,
+                       PasswordEncoder passwordEncoder, MailService mailService) {
         this.userRepository = userRepository;
+        this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailService = mailService;
     }
@@ -40,6 +50,20 @@ public class UserService {
         if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
             throw new IllegalArgumentException("Email already registered");
         }
+        String t = request.getApplyingForTier() != null ? request.getApplyingForTier().trim().toLowerCase() : "";
+        if (!"tier1".equals(t) && !"tier2".equals(t) && !"tier3".equals(t)) {
+            throw new IllegalArgumentException("Applying for tier is required and must be tier1, tier2, or tier3");
+        }
+        String payoutMethod = normalisePayoutMethod(request.getPayoutMethod());
+        if (request.getPayoutDestination() == null || request.getPayoutDestination().isBlank()) {
+            throw new IllegalArgumentException("Payout destination is required (e.g. M-Pesa number or bank account)");
+        }
+
+        Tenant tenant = resolveCurrentTenant();
+        if (tenant == null) {
+            throw new IllegalStateException("Tenant context required when adding an owner. Send X-Tenant-ID header.");
+        }
+
         String tempPassword = generateTemporaryPassword();
         User owner = User.builder()
                 .email(request.getEmail().toLowerCase())
@@ -48,12 +72,30 @@ public class UserService {
                 .role("owner")
                 .twoFactorEnabled(false)
                 .businessName(request.getBusinessName() != null ? request.getBusinessName().trim() : null)
+                .applyingForTier(t)
                 .build();
         owner = userRepository.save(owner);
         owner.setBusinessId(owner.getUserId());
         owner = userRepository.save(owner);
+
+        tenant.setDefaultPayoutMethod(payoutMethod);
+        tenant.setDefaultPayoutDestination(request.getPayoutDestination().trim());
+        tenantRepository.save(tenant);
+
         mailService.sendWelcomeOwner(owner.getEmail(), owner.getName(), owner.getBusinessName(), tempPassword);
         return toUserDto(owner);
+    }
+
+    private Tenant resolveCurrentTenant() {
+        String schema = TenantContext.getTenantSchema();
+        if (schema == null || schema.isBlank()) return null;
+        return tenantRepository.findBySchemaName(schema).orElse(null);
+    }
+
+    private static String normalisePayoutMethod(String method) {
+        if (method == null) return PAYOUT_METHOD_BANK;
+        String m = method.trim().toUpperCase();
+        return PAYOUT_METHOD_MPESA.equals(m) ? PAYOUT_METHOD_MPESA : PAYOUT_METHOD_BANK;
     }
 
     /**
@@ -86,6 +128,43 @@ public class UserService {
         staff = userRepository.save(staff);
         mailService.sendWelcomeStaff(staff.getEmail(), staff.getName(), owner.getBusinessName(), tempPassword);
         return toUserDto(staff);
+    }
+
+    /**
+     * Owner adds a courier. Phone is required for matching shipments by rider_phone.
+     * Temporary password is generated and sent by email.
+     */
+    @Transactional
+    public UserDto addCourier(AuthenticatedUser currentUser, AddCourierRequest request) {
+        if (!"owner".equalsIgnoreCase(currentUser.role())) {
+            throw new IllegalArgumentException("Only owners can add couriers");
+        }
+        User owner = userRepository.findById(currentUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Owner not found"));
+        if (owner.getBusinessId() == null || owner.getBusinessName() == null) {
+            throw new IllegalArgumentException("Owner business is not set");
+        }
+        if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
+            throw new IllegalArgumentException("Email already registered");
+        }
+        String phone = request.getPhone() != null ? request.getPhone().trim() : "";
+        if (phone.isEmpty()) {
+            throw new IllegalArgumentException("Phone is required for couriers");
+        }
+        String tempPassword = generateTemporaryPassword();
+        User courier = User.builder()
+                .email(request.getEmail().toLowerCase())
+                .passwordHash(passwordEncoder.encode(tempPassword))
+                .name(request.getName())
+                .phone(phone)
+                .role("courier")
+                .twoFactorEnabled(false)
+                .businessId(owner.getBusinessId())
+                .businessName(owner.getBusinessName())
+                .build();
+        courier = userRepository.save(courier);
+        mailService.sendWelcomeCourier(courier.getEmail(), courier.getName(), owner.getBusinessName(), tempPassword);
+        return toUserDto(courier);
     }
 
     /**
@@ -133,14 +212,35 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    public List<UserDto> listCouriers(AuthenticatedUser currentUser) {
+        if (!"owner".equalsIgnoreCase(currentUser.role())) {
+            throw new IllegalArgumentException("Only owners can list couriers");
+        }
+        User owner = userRepository.findById(currentUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Owner not found"));
+        if (owner.getBusinessId() == null) {
+            return List.of();
+        }
+        return userRepository.findByRoleAndBusinessId("courier", owner.getBusinessId()).stream()
+                .map(this::toUserDto)
+                .collect(Collectors.toList());
+    }
+
     private UserDto toUserDto(User user) {
         return UserDto.builder()
                 .id(user.getUserId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .phone(user.getPhone())
                 .role(user.getRole())
                 .businessId(user.getBusinessId() != null ? user.getBusinessId().toString() : null)
                 .businessName(user.getBusinessName())
+                .verificationStatus(user.getVerificationStatus())
+                .verifiedAt(user.getVerifiedAt())
+                .verifiedByUserId(user.getVerifiedByUserId())
+                .verificationNotes(user.getVerificationNotes())
+                .sellerTier(user.getSellerTier())
+                .applyingForTier(user.getApplyingForTier())
                 .build();
     }
 }

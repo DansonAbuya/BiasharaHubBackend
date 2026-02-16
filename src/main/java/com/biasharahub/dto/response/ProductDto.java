@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -13,7 +14,8 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProductDto {
+public class ProductDto implements Serializable {
+    private static final long serialVersionUID = 1L;
     private UUID id;
     private String name;
     private String category;
@@ -23,4 +25,5 @@ public class ProductDto {
     private String image;
     private List<String> images;
     private String businessId;
+    private String moderationStatus;
 }

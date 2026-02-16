@@ -1,8 +1,20 @@
-# Copy to application-local.yml and fill in your Gmail OAuth values.
-# Run with: spring.profiles.active=dev,local (or set GMAIL_* env vars instead).
+# Copy to application-local.yml and fill in your values.
+# Run with: spring.profiles.active=dev,local (or set env vars instead).
 # application-local.yml is gitignored so secrets are not committed.
 
+# Encryption at rest (user name, shipping address, payment transaction ID, payout details).
+# Use a 32-byte (or longer) secret; set ENCRYPTION_SECRET in production.
+# encryption:
+#   secret: "your-32-byte-minimum-secret-here"
+
 app:
+  # M-Pesa callbacks: uncomment and set to your public HTTPS URL (e.g. ngrok: run "ngrok http 5050" then use the https URL)
+  # mpesa:
+  #   stk-callback-url: "https://YOUR-NGROK-OR-DOMAIN/api/payments/mpesa/stk-callback"
+  #   b2c-callback-url: "https://YOUR-NGROK-OR-DOMAIN/api/payments/mpesa/b2c-callback"
+  # WhatsApp webhook: in Twilio Console set "When a message comes in" to this URL (must be HTTPS and public; use ngrok for local)
+  # whatsapp:
+  #   webhook-url: "https://YOUR-NGROK-OR-DOMAIN"   # Twilio will use: this + /api/webhooks/whatsapp
   mail:
     postmark:
       server-token: "POSTMARK_SERVER_TOKEN_HERE"

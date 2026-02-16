@@ -45,6 +45,21 @@ public class MailService {
     }
 
     /**
+     * Send WhatsApp link verification code. Used when a user links their WhatsApp number to an existing account.
+     */
+    public void sendWhatsAppLinkCode(@NonNull String toEmail, @NonNull String code) {
+        String text = """
+                Hi,
+
+                Your BiasharaHub WhatsApp link code is: %s
+
+                Enter this code in the WhatsApp chat to link your number. This code expires in 10 minutes.
+                If you did not request this, you can safely ignore this email.
+                """.formatted(code);
+        send(toEmail, "Your BiasharaHub WhatsApp link code", text);
+    }
+
+    /**
      * Send a generic email (e.g. password reset, notifications). Tenant from context.
      */
     public void send(@NonNull String toEmail, @NonNull String subject, @NonNull String textBody) {
@@ -97,6 +112,28 @@ public class MailService {
                 If you did not expect this email, please contact your business owner.
                 """.formatted(name, businessLine, temporaryPassword);
         send(toEmail, "Welcome to BiasharaHub – Staff account", text);
+    }
+
+    /**
+     * Welcome email for a new courier (added by owner). Includes business name and temporary password.
+     */
+    public void sendWelcomeCourier(@NonNull String toEmail, @NonNull String name, String businessName, @NonNull String temporaryPassword) {
+        String businessLine = (businessName != null && !businessName.isBlank())
+                ? "You have been added as a courier for \"" + businessName + "\" on BiasharaHub."
+                : "You have been added as a courier on BiasharaHub.";
+        String text = """
+                Hi %s,
+
+                %s
+
+                Your temporary password is: %s
+
+                Log in to the BiasharaHub app and use the Courier Portal to view and update deliveries assigned to you.
+                We recommend changing your password after first login.
+
+                If you did not expect this email, please contact your business owner.
+                """.formatted(name, businessLine, temporaryPassword);
+        send(toEmail, "Welcome to BiasharaHub – Courier account", text);
     }
 
     /**

@@ -55,6 +55,24 @@ public class VerificationCodeService {
         mailService.sendWelcomeCustomerWithCode(user.getEmail(), user.getName(), code);
     }
 
+    /**
+     * Create and send a one-time code for linking a WhatsApp number to an existing customer account.
+     * Code is valid for 10 minutes.
+     */
+    @Transactional
+    public void createAndSendWhatsAppLinkCode(User user) {
+        verificationCodeRepository.deleteByUser(user);
+        String code = generateVerificationCode();
+        Instant expiresAt = Instant.now().plus(10, ChronoUnit.MINUTES);
+        VerificationCode verificationCode = VerificationCode.builder()
+                .user(user)
+                .verificationCode(code)
+                .expiresAt(expiresAt)
+                .build();
+        verificationCodeRepository.save(verificationCode);
+        mailService.sendWhatsAppLinkCode(user.getEmail(), code);
+    }
+
     private static String generateVerificationCode() {
         int code = (int) (Math.random() * 900_000) + 100_000;
         return Integer.toString(code);

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="026-trust-safety-users-strikes-checklist" author="biasharahub">
+        <comment>Trust &amp; Safety: seller strike_count, account_status (active/suspended/banned), verification checklist (phone, M-Pesa, location, terms)</comment>
+        <sqlFile path="db/changelog/changes/026-trust-safety-users-strikes-checklist.sql" splitStatements="false"/>
+    </changeSet>
+
+</databaseChangeLog>

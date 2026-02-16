@@ -152,6 +152,9 @@ public class OAuth2TwoFactorService {
                 .name(user.getName())
                 .email(user.getEmail())
                 .role(user.getRole())
+                .businessId(user.getBusinessId() != null ? user.getBusinessId().toString() : null)
+                .businessName(user.getBusinessName())
+                .applyingForTier(user.getApplyingForTier())
                 .build();
     }
 }

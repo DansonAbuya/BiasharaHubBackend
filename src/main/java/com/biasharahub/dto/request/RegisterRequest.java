@@ -17,4 +17,7 @@ public class RegisterRequest {
     @NotBlank
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
+
+    /** Optional phone (e.g. +254712345678 or 0712345678). Used for WhatsApp chatbot and notifications. */
+    private String phone;
 }

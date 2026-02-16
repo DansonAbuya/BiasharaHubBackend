@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="024-add-payout-external-reference" author="Danson Abuya">
+        <addColumn schemaName="public" tableName="tenant_payouts">
+            <column name="external_reference" type="VARCHAR(255)"/>
+        </addColumn>
+        <comment>Store M-Pesa B2C ConversationID for callback matching</comment>
+    </changeSet>
+
+</databaseChangeLog>

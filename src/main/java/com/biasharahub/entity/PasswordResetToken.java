@@ -24,8 +24,12 @@ public class PasswordResetToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, unique = true)
+    /** Plain token only in email; not stored. Stored as tokenHash for lookup. */
+    @Column(unique = true)
     private String token;
+
+    @Column(name = "token_hash", length = 64)
+    private String tokenHash;
 
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
