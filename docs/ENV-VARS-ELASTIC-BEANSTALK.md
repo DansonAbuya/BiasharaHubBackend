@@ -4,6 +4,38 @@ Your `application.yml` uses placeholders like `${VAR_NAME:default}`. In Elastic 
 
 ---
 
+## UAT: Make the application use the UAT database (not localhost)
+
+**If the application connects to localhost**, it means the environment variables for the database (and Redis) are **not set** on the Elastic Beanstalk environment. The app only uses the UAT database when you set them in EB.
+
+**Right setup for UAT:**
+
+1. In **AWS Console** → **Elastic Beanstalk** → open your UAT environment (e.g. **biasharahub-uat**).
+2. Go to **Configuration** → **Software** → **Edit**.
+3. Scroll to **Environment properties**.
+4. Add (or update) these **exact** names and your UAT values:
+
+   | Name | Value (use your real UAT values) |
+   |------|----------------------------------|
+   | `SPRING_PROFILES_ACTIVE` | `test` |
+   | `SERVER_PORT` | `5000` |
+   | `DB_URL` | `jdbc:postgresql://YOUR-RDS-ENDPOINT:5432/YOUR_UAT_DB_NAME` |
+   | `DB_USERNAME` | Your RDS username |
+   | `DB_PASSWORD` | Your RDS password |
+   | `JWT_SECRET` | A long random secret (e.g. from `openssl rand -base64 32`) |
+   | `APP_FRONTEND_URL` | `https://biasharahub-app-test.sysnovatechnologies.com` |
+   | `REDIS_HOST` | Your ElastiCache Redis endpoint hostname |
+   | `REDIS_PORT` | `6379` |
+
+5. Click **Apply**. EB will redeploy; the application will then use the UAT database and Redis.
+
+- **DB_URL**: Get the RDS endpoint from **RDS** → your DB instance → **Connectivity & security** → **Endpoint**. Use the UAT database name you created (e.g. `biasharahub_test`).
+- **REDIS_HOST**: Get from **ElastiCache** → your Redis cache → **Primary endpoint** (hostname only).
+
+**If the app still uses localhost:** Some EB setups pass env vars using Spring Boot’s standard names. In **Environment properties**, add these as well (same values): `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `SPRING_DATA_REDIS_HOST`, `SPRING_DATA_REDIS_PORT`. The app accepts both `DB_*`/`REDIS_*` and `SPRING_DATASOURCE_*`/`SPRING_DATA_REDIS_*`.
+
+---
+
 ## Where to set them in AWS
 
 1. **Elastic Beanstalk** → your environment (e.g. **biasharahub-uat**)
@@ -16,13 +48,15 @@ Your `application.yml` uses placeholders like `${VAR_NAME:default}`. In Elastic 
 
 ## Required (UAT / any environment)
 
+Use either **DB_*** / **REDIS_*** or Spring Boot standard **SPRING_DATASOURCE_*** / **SPRING_DATA_REDIS_*** (if EB does not pass DB_* through).
+
 | Name | Example value | Used for |
 |------|----------------|----------|
 | `SPRING_PROFILES_ACTIVE` | `test` (UAT) or `prod` | Profile (test/prod) |
 | `SERVER_PORT` | `5000` | Port EB proxy expects |
-| `DB_URL` | `jdbc:postgresql://xxx.rds.amazonaws.com:5432/biasharahub_test` | Database URL |
-| `DB_USERNAME` | `biasharaadmin` | DB user |
-| `DB_PASSWORD` | (your RDS password) | DB password |
+| `DB_URL` or `SPRING_DATASOURCE_URL` | `jdbc:postgresql://xxx.rds.amazonaws.com:5432/biasharahub_test` | Database URL |
+| `DB_USERNAME` or `SPRING_DATASOURCE_USERNAME` | `biasharaadmin` | DB user |
+| `DB_PASSWORD` or `SPRING_DATASOURCE_PASSWORD` | (your RDS password) | DB password |
 | `JWT_SECRET` | (e.g. from `openssl rand -base64 32`) | JWT signing |
 | `APP_FRONTEND_URL` | `https://biasharahub-app-test.sysnovatechnologies.com` | Frontend URL (links, redirects) |
 

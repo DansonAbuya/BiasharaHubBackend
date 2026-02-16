@@ -3,7 +3,7 @@
 # Override any value with environment variables.
 
 server:
-  port: ${SERVER_PORT:5000}
+  port: ${SERVER_PORT:}
 
 spring:
   jpa:

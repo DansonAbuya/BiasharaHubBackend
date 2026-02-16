@@ -16,10 +16,10 @@ spring:
             enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
 
   datasource:
-    # Use DB_URL from environment (e.g. jdbc:postgresql://host:5432/biasharahub_test for UAT, biasharahub for prod).
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/biasharahub}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:password}
+    # EB / env: set DB_URL or SPRING_DATASOURCE_URL (Spring standard). Same for username/password.
+    url: ${SPRING_DATASOURCE_URL:${DB_URL:jdbc:postgresql://localhost:5432/biasharahub}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:password}}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -64,8 +64,8 @@ spring:
   # Redis connection for cache and other features
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
+      port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}
       repositories:
         # We only use Redis as a cache backend, not as a Spring Data store
         enabled: false
