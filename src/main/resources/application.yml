@@ -128,7 +128,7 @@ app:
 
   # Kafka (event publishing for orders/payments). Set KAFKA_ENABLED=true and KAFKA_BOOTSTRAP_SERVERS to use.
   kafka:
-    enabled: ${KAFKA_ENABLED:false}
+    enabled: ${KAFKA_ENABLED:true}
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     topics:
       order-created: ${KAFKA_TOPIC_ORDER_CREATED:orders.created}
@@ -151,7 +151,7 @@ app:
   # "Merchant does not exist" (500.001.1001) = shortcode/credentials not valid for this app; use the ones from the Daraja portal.
   # Callback URLs must be HTTPS and publicly reachable; for local dev use a tunnel (e.g. ngrok http 5050).
   mpesa:
-    enabled: ${MPESA_ENABLED:false}
+    enabled: ${MPESA_ENABLED:true}
     environment: ${MPESA_ENV:sandbox}          # sandbox or production
     base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
     shortcode: ${MPESA_SHORTCODE:174379}       # use your sandbox Lipa Na M-Pesa Online shortcode from Daraja portal (often 174379)
@@ -173,7 +173,7 @@ app:
   # Use Twilio Sandbox (https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn) or a WhatsApp Business number.
   # Webhook: configure in Twilio Console "When a message comes in" → set to: https://YOUR-PUBLIC-HOST/api/webhooks/whatsapp (must be HTTPS and publicly reachable; use ngrok for local).
   whatsapp:
-    enabled: ${WHATSAPP_ENABLED:false}
+    enabled: ${WHATSAPP_ENABLED:true}
     twilio-account-sid: ${TWILIO_ACCOUNT_SID:}
     twilio-auth-token: ${TWILIO_AUTH_TOKEN:}
     # Sender: Sandbox e.g. whatsapp:+14155238886, or your WhatsApp Business number (E.164 with whatsapp: prefix)
@@ -196,7 +196,7 @@ app:
 # Cloudflare R2 (S3-compatible) for product images and verification documents
 # Must be top-level "r2:" for R2Config prefix to work.
 r2:
-  enabled: ${R2_ENABLED:false}
+  enabled: ${R2_ENABLED:true}
   bucket: ${R2_BUCKET:biasharahub-product-images}
   endpoint: ${R2_ENDPOINT:https://03c04814dd2c76d33ab9692b1255838c.r2.cloudflarestorage.com}
   access-key-id: ${R2_ACCESS_KEY_ID:}
