@@ -25,7 +25,8 @@ public class AnalyticsController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAnalytics(@AuthenticationPrincipal AuthenticatedUser user) {
         if (user == null) return ResponseEntity.status(401).build();
-        if (!"owner".equalsIgnoreCase(user.role()) && !"staff".equalsIgnoreCase(user.role())) {
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        if (!"owner".equals(role) && !"staff".equals(role) && !"super_admin".equals(role) && !"assistant_admin".equals(role)) {
             return ResponseEntity.status(403).build();
         }
         BigDecimal totalRevenue = orderRepository.sumTotalRevenue();
@@ -39,7 +40,14 @@ public class AnalyticsController {
         analytics.put("totalRevenue", totalRevenue);
         analytics.put("pendingOrders", pendingOrders);
         analytics.put("averageOrderValue", avgOrderValue);
-        analytics.put("topProducts", productRepository.findAll().stream().limit(5).toList());
+        analytics.put("topProducts", productRepository.findAll().stream().limit(5)
+                .map(p -> java.util.Map.<String, Object>of(
+                        "id", p.getProductId(),
+                        "name", p.getName() != null ? p.getName() : "",
+                        "quantity", p.getQuantity() != null ? p.getQuantity() : 0,
+                        "price", p.getPrice() != null ? p.getPrice() : java.math.BigDecimal.ZERO
+                ))
+                .toList());
         return ResponseEntity.ok(analytics);
     }
 }

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="030-courier-provider-integration" author="biasharahub">
+        <comment>Add provider integration fields: provider_type (MANUAL, DHL, FEDEX, SENDY, REST), api_base_url, config_json. API keys stay in env.</comment>
+        <sql>
+            ALTER TABLE public.courier_services
+                ADD COLUMN IF NOT EXISTS provider_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL',
+                ADD COLUMN IF NOT EXISTS api_base_url VARCHAR(512),
+                ADD COLUMN IF NOT EXISTS config_json TEXT;
+            COMMENT ON COLUMN public.courier_services.provider_type IS 'MANUAL=no API, DHL/FEDEX/SENDY/REST=integrated provider';
+            COMMENT ON COLUMN public.courier_services.api_base_url IS 'Provider API base URL (REST or specific provider)';
+            COMMENT ON COLUMN public.courier_services.config_json IS 'Non-secret provider config (e.g. default service type, account id)';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

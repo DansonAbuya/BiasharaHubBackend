@@ -26,7 +26,7 @@ public class OpenApiConfig {
                 .info(new io.swagger.v3.oas.models.info.Info()
                         .title("BiasharaHub API")
                         .version("1.0")
-                        .description("BiasharaHub - Multi-tenant SME Commerce Platform API"))
+                        .description("BiasharaHub - Multi-tenant SME Commerce Platform API. @ Sysnova Technologies."))
                 .servers(List.of(new Server().url(serverUrl).description("Local server")));
     }
 }

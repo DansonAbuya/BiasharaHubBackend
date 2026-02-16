@@ -15,7 +15,20 @@ public class UserDto {
     private UUID id;
     private String name;
     private String email;
+    /** Optional phone for WhatsApp and notifications (e.g. +254712345678). */
+    private String phone;
     private String role;
     private String businessId;
     private String businessName;
+    private String verificationStatus;
+    private java.time.Instant verifiedAt;
+    private UUID verifiedByUserId;
+    private String verificationNotes;
+    private String sellerTier;
+    /** Optional: tier the owner is applying for (tier1/tier2/tier3). Set at onboarding. */
+    private String applyingForTier;
+    /** Trust & Safety: strike count (3+=suspended, 5+=banned). */
+    private Integer strikeCount;
+    /** Trust & Safety: active, suspended, banned. */
+    private String accountStatus;
 }

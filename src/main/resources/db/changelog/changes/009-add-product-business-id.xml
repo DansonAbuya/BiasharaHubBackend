@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="009-add-product-business-id" author="biasharahub">
+        <comment>Add business_id to products for owner/staff product scoping</comment>
+        <sql>
+            ALTER TABLE tenant_default.products ADD COLUMN IF NOT EXISTS business_id UUID;
+            CREATE INDEX IF NOT EXISTS idx_products_business_id ON tenant_default.products(business_id);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

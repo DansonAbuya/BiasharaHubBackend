@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+  build:
+    commands:
+      - mvn clean package -DskipTests
+  post_build:
+    commands:
+      - cp target/biasharahub-backend-1.0.0-SNAPSHOT.jar .
+      - zip -r deploy.zip biasharahub-backend-1.0.0-SNAPSHOT.jar
+
+artifacts:
+  files:
+    - deploy.zip

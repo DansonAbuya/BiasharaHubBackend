@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="008-add-user-business-fields" author="biasharahub">
+        <comment>Add business_id and business_name to users for owner/staff business context</comment>
+        <sql>
+            ALTER TABLE tenant_default.users ADD COLUMN IF NOT EXISTS business_id UUID;
+            ALTER TABLE tenant_default.users ADD COLUMN IF NOT EXISTS business_name VARCHAR(255);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
