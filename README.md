@@ -22,35 +22,26 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
 
 ## Setup
 
-1. **Initialize the database** (creates `biasharahub` if it doesn't exist):
-   - **Windows (CMD):** `scripts\init-database.bat`
-   - **Windows (PowerShell):** `.\scripts\init-database.ps1`
-   - **Linux/Mac:** `./scripts/init-database.sh`
-   - **Maven:** `mvn validate -Pinit-db` or `mvn spring-boot:run -Pinit-db` (runs init before start)
-   - **Manual:** `psql -U postgres -h localhost -f scripts/init-database.sql`
+1. **Create the database** (use the database name from your environment):
+   - **Local:** Create a database (e.g. `biasharahub`) manually: `psql -U postgres -c "CREATE DATABASE biasharahub;"`
+   - **UAT/Prod:** Use the database configured in your environment (e.g. `biasharahub_test`, `biasharahub`). Set `DB_URL` accordingly.
 
-2. **Set default schema (one-time, security best practice):**  
-   The app relies on the server default schema instead of the JDBC URL. Run as a DB admin (e.g. `postgres`):
-   ```bash
-   psql -U postgres -h localhost -d biasharahub -f src/main/resources/db/scripts/set-default-schema.sql
-   ```
-   Or run the `ALTER DATABASE biasharahub SET search_path TO public;` statement from that file in any SQL client. New connections will then use `public` by default.
+2. **Set default schema (one-time, optional):**  
+   See `src/main/resources/db/scripts/set-default-schema.sql`. Replace `YOUR_DATABASE` with your database name and run the `ALTER DATABASE` statement.
 
-3. **Configure environment** (required if your PostgreSQL password is not `postgres`):
+3. **Configure environment:**
    ```bash
+   # Required: DB_URL must point to your database (used in UAT/Prod; defaults to localhost/biasharahub for local)
    # Windows (PowerShell)
+   $env:DB_URL="jdbc:postgresql://localhost:5432/biasharahub"
    $env:DB_USERNAME="postgres"
    $env:DB_PASSWORD="your_postgres_password"
 
-   # Windows (CMD)
-   set DB_USERNAME=postgres
-   set DB_PASSWORD=your_postgres_password
-
    # Linux/Mac
-   export DB_USERNAME=postgres
-   export DB_PASSWORD=your_postgres_password
+   export DB_URL="jdbc:postgresql://localhost:5432/biasharahub"
+   export DB_USERNAME="postgres"
+   export DB_PASSWORD="your_postgres_password"
    ```
-   The app auto-creates the `biasharahub` database on startup if it doesn't exist. Set `DB_SKIP_BOOTSTRAP=true` to disable this.
 
 4. **Add logo and favicon:**
    Copy `logo.png` and `favicon.png` to `src/main/resources/static/`
@@ -61,7 +52,7 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
    mvn spring-boot:run
    ```
 
-6. **API base URL:** `http://localhost:8080/api`
+6. **API base URL:** `http://localhost:5050/api`
 
 ## Multi-Tenancy (Schema per Tenant)
 

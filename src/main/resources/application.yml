@@ -16,8 +16,8 @@ spring:
             enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
 
   datasource:
-    # Default schema is set server-side (see db/scripts/set-default-schema.sql). Do not set currentSchema in URL.
-    url: jdbc:postgresql://localhost:5432/biasharahub
+    # Use DB_URL from environment (e.g. jdbc:postgresql://host:5432/biasharahub_test for UAT, biasharahub for prod).
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/biasharahub}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
