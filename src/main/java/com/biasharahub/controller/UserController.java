@@ -1,5 +1,6 @@
 package com.biasharahub.controller;
 
+import com.biasharahub.dto.request.AddCourierRequest;
 import com.biasharahub.dto.request.AddStaffRequest;
 import com.biasharahub.dto.response.UserDto;
 import com.biasharahub.entity.User;
@@ -100,6 +101,28 @@ public class UserController {
     public ResponseEntity<List<UserDto>> listStaff(@AuthenticationPrincipal AuthenticatedUser user) {
         try {
             return ResponseEntity.ok(userService.listStaff(user));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(403).build();
+        }
+    }
+
+    @PostMapping("/couriers")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<?> addCourier(@AuthenticationPrincipal AuthenticatedUser user,
+                                        @Valid @RequestBody AddCourierRequest request) {
+        try {
+            UserDto courier = userService.addCourier(user, request);
+            return ResponseEntity.ok(courier);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/couriers")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<List<UserDto>> listCouriers(@AuthenticationPrincipal AuthenticatedUser user) {
+        try {
+            return ResponseEntity.ok(userService.listCouriers(user));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(403).build();
         }

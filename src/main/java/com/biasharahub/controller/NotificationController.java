@@ -16,6 +16,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * In-app notifications. All endpoints return or act only on notifications for the authenticated user.
+ * Notifications are strictly per-user; no user can see or mark another user's notifications.
+ */
 @RestController
 @RequestMapping("/notifications")
 @RequiredArgsConstructor
@@ -24,6 +28,7 @@ public class NotificationController {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
 
+    /** List notifications for the current user only. */
     @GetMapping
     public ResponseEntity<List<NotificationDto>> listNotifications(
             @AuthenticationPrincipal AuthenticatedUser currentUser,
@@ -42,6 +47,7 @@ public class NotificationController {
         return ResponseEntity.ok(dtoList);
     }
 
+    /** Mark a notification as read. Returns 404 if the notification does not belong to the current user. */
     @PostMapping("/{id}/read")
     public ResponseEntity<Void> markAsRead(
             @AuthenticationPrincipal AuthenticatedUser currentUser,
@@ -65,6 +71,7 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
+    /** Mark all notifications for the current user as read. */
     @PostMapping("/read-all")
     public ResponseEntity<Void> markAllAsRead(@AuthenticationPrincipal AuthenticatedUser currentUser) {
         if (currentUser == null) {

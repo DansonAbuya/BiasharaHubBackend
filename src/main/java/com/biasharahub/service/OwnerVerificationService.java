@@ -2,6 +2,7 @@ package com.biasharahub.service;
 
 import com.biasharahub.dto.response.OwnerVerificationDocumentDto;
 import com.biasharahub.dto.response.UserDto;
+import com.biasharahub.dto.response.VerificationChecklistDto;
 import com.biasharahub.entity.OwnerVerificationDocument;
 import com.biasharahub.entity.User;
 import com.biasharahub.repository.OwnerVerificationDocumentRepository;
@@ -79,6 +80,43 @@ public class OwnerVerificationService {
                 .verificationNotes(user.getVerificationNotes())
                 .sellerTier(user.getSellerTier())
                 .applyingForTier(user.getApplyingForTier())
+                .strikeCount(user.getStrikeCount())
+                .accountStatus(user.getAccountStatus())
+                .build();
+    }
+
+    /** Owner: get verification checklist (phone, M-Pesa, location, terms). */
+    public VerificationChecklistDto getMyChecklist(AuthenticatedUser currentUser) {
+        User user = userRepository.findById(currentUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return VerificationChecklistDto.builder()
+                .phoneVerified(user.getPhoneVerifiedAt() != null)
+                .mpesaValidated(user.getMpesaValidatedAt() != null)
+                .businessLocationVerified(user.getBusinessLocationVerifiedAt() != null)
+                .termsAccepted(user.getTermsAcceptedAt() != null)
+                .build();
+    }
+
+    /** Admin: set verification checklist flags for an owner. */
+    @Transactional
+    public VerificationChecklistDto setOwnerChecklist(UUID ownerUserId, Boolean phoneVerified, Boolean mpesaValidated,
+                                                      Boolean businessLocationVerified, Boolean termsAccepted) {
+        User owner = userRepository.findById(ownerUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Owner not found"));
+        if (!"owner".equalsIgnoreCase(owner.getRole())) {
+            throw new IllegalArgumentException("User is not an owner");
+        }
+        Instant now = Instant.now();
+        if (Boolean.TRUE.equals(phoneVerified)) owner.setPhoneVerifiedAt(now);
+        if (Boolean.TRUE.equals(mpesaValidated)) owner.setMpesaValidatedAt(now);
+        if (Boolean.TRUE.equals(businessLocationVerified)) owner.setBusinessLocationVerifiedAt(now);
+        if (Boolean.TRUE.equals(termsAccepted)) owner.setTermsAcceptedAt(now);
+        userRepository.save(owner);
+        return VerificationChecklistDto.builder()
+                .phoneVerified(owner.getPhoneVerifiedAt() != null)
+                .mpesaValidated(owner.getMpesaValidatedAt() != null)
+                .businessLocationVerified(owner.getBusinessLocationVerifiedAt() != null)
+                .termsAccepted(owner.getTermsAcceptedAt() != null)
                 .build();
     }
 
@@ -148,6 +186,8 @@ public class OwnerVerificationService {
                 .verificationNotes(u.getVerificationNotes())
                 .sellerTier(u.getSellerTier())
                 .applyingForTier(u.getApplyingForTier())
+                .strikeCount(u.getStrikeCount())
+                .accountStatus(u.getAccountStatus())
                 .build();
     }
 }

@@ -127,6 +127,35 @@ public class User {
     @Column(name = "applying_for_tier", length = 32)
     private String applyingForTier;
 
+    /** Trust & Safety: total strike count (late_shipping=1, wrong_item=2, fraud=3 per incident). 3+=suspended, 5+=banned. */
+    @Column(name = "strike_count")
+    @Builder.Default
+    private Integer strikeCount = 0;
+
+    /** Trust & Safety: active, suspended, banned. */
+    @Column(name = "account_status", length = 32)
+    @Builder.Default
+    private String accountStatus = "active";
+
+    @Column(name = "suspended_at")
+    private Instant suspendedAt;
+
+    @Column(name = "banned_at")
+    private Instant bannedAt;
+
+    /** Verification checklist: phone verified (e.g. OTP or admin). */
+    @Column(name = "phone_verified_at")
+    private Instant phoneVerifiedAt;
+
+    @Column(name = "mpesa_validated_at")
+    private Instant mpesaValidatedAt;
+
+    @Column(name = "business_location_verified_at")
+    private Instant businessLocationVerifiedAt;
+
+    @Column(name = "terms_accepted_at")
+    private Instant termsAcceptedAt;
+
     @Column(name = "created_at")
     private Instant createdAt;
 

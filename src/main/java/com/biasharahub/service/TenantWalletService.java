@@ -69,6 +69,25 @@ public class TenantWalletService {
         return resolveCurrentTenant().map(walletEntryRepository::calculateBalance);
     }
 
+    /**
+     * Debit current tenant wallet for a payout. Call only after validating balance.
+     */
+    @Transactional
+    public void recordDebitForCurrentTenantPayout(BigDecimal amount, String payoutId, String description) {
+        Tenant tenant = resolveCurrentTenant().orElse(null);
+        if (tenant == null || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        TenantWalletEntry debit = TenantWalletEntry.builder()
+                .tenant(tenant)
+                .entryType("DEBIT")
+                .amount(amount)
+                .referenceId(payoutId)
+                .description(description != null ? description : "Payout to seller")
+                .build();
+        walletEntryRepository.save(debit);
+    }
+
     private Optional<Tenant> resolveCurrentTenant() {
         String schema = TenantContext.getTenantSchema();
         if (schema == null || schema.isBlank()) {

@@ -2,6 +2,7 @@ package com.biasharahub.controller;
 
 import com.biasharahub.dto.response.OwnerVerificationDocumentDto;
 import com.biasharahub.dto.response.UserDto;
+import com.biasharahub.dto.response.VerificationChecklistDto;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.OwnerVerificationService;
 import com.biasharahub.service.R2StorageService;
@@ -93,6 +94,12 @@ public class VerificationController {
         return ResponseEntity.ok(verificationService.getMyVerificationStatus(user));
     }
 
+    @GetMapping("/checklist")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<VerificationChecklistDto> getMyChecklist(@AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(verificationService.getMyChecklist(user));
+    }
+
     @GetMapping("/admin/pending-owners")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
     public ResponseEntity<List<UserDto>> listPendingOwners() {
@@ -103,6 +110,19 @@ public class VerificationController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
     public ResponseEntity<List<OwnerVerificationDocumentDto>> getOwnerDocuments(@PathVariable UUID ownerId) {
         return ResponseEntity.ok(verificationService.getDocumentsForOwner(ownerId));
+    }
+
+    @PatchMapping("/admin/owners/{ownerId}/checklist")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+    public ResponseEntity<VerificationChecklistDto> setOwnerChecklist(
+            @PathVariable UUID ownerId,
+            @RequestBody Map<String, Boolean> body) {
+        VerificationChecklistDto dto = verificationService.setOwnerChecklist(ownerId,
+                body.get("phoneVerified"),
+                body.get("mpesaValidated"),
+                body.get("businessLocationVerified"),
+                body.get("termsAccepted"));
+        return ResponseEntity.ok(dto);
     }
 
     @PatchMapping("/admin/owners/{ownerId}")

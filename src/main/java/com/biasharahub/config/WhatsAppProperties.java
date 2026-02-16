@@ -35,6 +35,12 @@ public class WhatsAppProperties {
      */
     private String fromNumber;
 
+    /**
+     * Optional public base URL for the WhatsApp webhook. Configure in Twilio "When a message comes in" as:
+     * {@code webhookUrl + "/api/webhooks/whatsapp"} (e.g. https://abc123.ngrok-free.app/api/webhooks/whatsapp).
+     */
+    private String webhookUrl;
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -65,5 +71,13 @@ public class WhatsAppProperties {
 
     public void setFromNumber(String fromNumber) {
         this.fromNumber = fromNumber;
+    }
+
+    public String getWebhookUrl() {
+        return webhookUrl;
+    }
+
+    public void setWebhookUrl(String webhookUrl) {
+        this.webhookUrl = webhookUrl;
     }
 }

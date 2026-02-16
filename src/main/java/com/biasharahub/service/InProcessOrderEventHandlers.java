@@ -79,18 +79,8 @@ public class InProcessOrderEventHandlers {
                             .otpCode(otp)
                             .build();
                     shipment = shipmentRepository.save(shipment);
-                    log.info("Created shipment {} for paid order {}", shipment.getShipmentId(), orderId);
-
-                    try {
-                        whatsAppNotificationService.notifyShipmentUpdated(shipment);
-                    } catch (Exception e) {
-                        log.warn("Failed to send WhatsApp shipment-created notification for {}: {}", shipment.getShipmentId(), e.getMessage());
-                    }
-                    try {
-                        inAppNotificationService.notifyShipmentUpdated(shipment);
-                    } catch (Exception e) {
-                        log.warn("Failed to create in-app shipment-created notification for {}: {}", shipment.getShipmentId(), e.getMessage());
-                    }
+                    log.info("Created shipment {} for paid order {} – seller will add dispatch details and notify customer", shipment.getShipmentId(), orderId);
+                    // Do NOT notify here – customer learns about dispatch when seller marks as dispatched with courier/vehicle details
                 } else {
                     log.debug("Order {} already has a shipment, skipping auto-create", orderId);
                 }

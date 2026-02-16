@@ -54,6 +54,12 @@ public class TenantPayout {
     @Column(nullable = false, length = 32)
     private String status;
 
+    /**
+     * M-Pesa B2C ConversationID (or similar) for callback matching.
+     */
+    @Column(name = "external_reference", length = 255)
+    private String externalReference;
+
     @Column(name = "failure_reason")
     private String failureReason;
 

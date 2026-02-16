@@ -15,6 +15,7 @@ import java.util.UUID;
 public class ShipmentDto {
     private UUID id;
     private UUID orderId;
+    private UUID assignedCourierId;
     private String deliveryMode;
     private String status;
     private String carrier;
@@ -30,4 +31,9 @@ public class ShipmentDto {
     private Instant escrowReleasedAt;
     // For Phase 1 MVP we expose OTP so customer can see it in-app.
     private String otpCode;
+    /** Trust & Safety: delivery proof (signature/photo URLs, GPS). */
+    private String deliverySignatureUrl;
+    private String deliveryPhotoUrl;
+    private java.math.BigDecimal deliveryGpsLat;
+    private java.math.BigDecimal deliveryGpsLng;
 }

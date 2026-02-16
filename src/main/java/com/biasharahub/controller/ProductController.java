@@ -48,6 +48,7 @@ public class ProductController {
     public List<BusinessDto> listBusinesses() {
         List<BusinessDto> businesses = userRepository.findByRoleIgnoreCaseAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified")
                 .stream()
+                .filter(u -> u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus()))
                 .map(u -> BusinessDto.builder()
                         .id(u.getBusinessId())
                         .name(u.getBusinessName() != null ? u.getBusinessName() : "—")
@@ -124,6 +125,7 @@ public class ProductController {
             }
             Set<UUID> verifiedBusinessIds = userRepository.findByRoleIgnoreCaseAndVerificationStatusOrderByCreatedAtAsc("owner", "verified")
                     .stream()
+                    .filter(u -> u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus()))
                     .map(User::getUserId)
                     .collect(Collectors.toSet());
             products = products.stream()

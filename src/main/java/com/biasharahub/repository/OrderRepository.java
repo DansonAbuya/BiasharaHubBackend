@@ -27,6 +27,14 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.orderStatus = 'delivered'")
     BigDecimal sumTotalRevenue();
 
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o JOIN o.items i JOIN i.product p WHERE p.businessId = :businessId AND o.orderStatus = 'delivered'")
+    BigDecimal sumRevenueByBusinessId(@Param("businessId") UUID businessId);
+
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o JOIN o.items i JOIN i.product p WHERE p.businessId = :businessId AND o.orderStatus = 'delivered' AND o.orderedAt >= :from AND o.orderedAt < :toExclusive")
+    BigDecimal sumRevenueByBusinessIdAndDateRange(@Param("businessId") UUID businessId,
+                                                  @Param("from") java.time.Instant from,
+                                                  @Param("toExclusive") java.time.Instant toExclusive);
+
     @Query("SELECT COUNT(o) FROM Order o WHERE o.orderStatus = 'pending'")
     long countPendingOrders();
 

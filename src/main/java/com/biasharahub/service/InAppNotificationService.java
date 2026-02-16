@@ -70,14 +70,42 @@ public class InAppNotificationService {
         if ("DELIVERED".equalsIgnoreCase(status) || "COLLECTED".equalsIgnoreCase(status)) {
             title = "Delivery completed";
             message = "Your order " + order.getOrderNumber() + " has been delivered. Thank you for shopping with us.";
+        } else if ("IN_TRANSIT".equalsIgnoreCase(status) || "SHIPPED".equalsIgnoreCase(status) || "OUT_FOR_DELIVERY".equalsIgnoreCase(status)) {
+            title = "Order dispatched";
+            message = buildDispatchMessage(order.getOrderNumber(), shipment);
         } else if ("CREATED".equalsIgnoreCase(status)) {
-            title = "Shipment created";
-            message = "We created a shipment for order " + order.getOrderNumber() + ".";
+            return;
         } else {
             title = "Shipment update";
             message = "Your order " + order.getOrderNumber() + " shipment status is now: " + status + ".";
         }
-        saveNotification(customer, "shipment", title, message, "/dashboard/shipments");
+        saveNotification(customer, "shipment", title, message, "/dashboard/orders");
+    }
+
+    private String buildDispatchMessage(String orderNumber, Shipment s) {
+        StringBuilder sb = new StringBuilder("Your order " + orderNumber + " has been dispatched.");
+        String mode = s.getDeliveryMode() != null ? s.getDeliveryMode() : "SELLER_SELF";
+        if ("COURIER".equalsIgnoreCase(mode) && s.getCourierService() != null && !s.getCourierService().isBlank()) {
+            sb.append(" Delivery by: ").append(s.getCourierService());
+            if (s.getTrackingNumber() != null && !s.getTrackingNumber().isBlank()) {
+                sb.append(". Tracking: ").append(s.getTrackingNumber());
+            }
+        } else if ((s.getRiderVehicle() != null && !s.getRiderVehicle().isBlank()) || (s.getRiderName() != null && !s.getRiderName().isBlank())) {
+            if (s.getRiderName() != null && !s.getRiderName().isBlank()) sb.append(" Driver: ").append(s.getRiderName());
+            if (s.getRiderVehicle() != null && !s.getRiderVehicle().isBlank()) {
+                if (sb.length() > 0 && sb.charAt(sb.length() - 1) != ' ') sb.append(". ");
+                sb.append("Vehicle/Bike reg: ").append(s.getRiderVehicle());
+            }
+        } else if (s.getCourierService() != null && !s.getCourierService().isBlank()) {
+            sb.append(" Delivery by: ").append(s.getCourierService());
+        } else if ("CUSTOMER_PICKUP".equalsIgnoreCase(mode)) {
+            sb.append(" Ready for pickup.");
+            if (s.getPickupLocation() != null && !s.getPickupLocation().isBlank()) {
+                sb.append(" Location: ").append(s.getPickupLocation());
+            }
+        }
+        sb.append(".");
+        return sb.toString();
     }
 
     private void saveNotification(User user, String type, String title, String message, String actionUrl) {

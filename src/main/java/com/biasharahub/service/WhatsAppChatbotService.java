@@ -280,14 +280,22 @@ public class WhatsAppChatbotService {
         if (lower.equals("order") || lower.contains("my order")) {
             return replyOrderStatus(customer);
         }
-        // Pay: "Please Pay Now." → STK push
+        // Unpaid orders: same as PAY – list orders that need payment
+        if (lower.contains("unpaid") || lower.contains("orders to pay") || lower.contains("pay for order")) {
+            var payMatcher = PAY_ORDER.matcher(message.trim());
+            if (payMatcher.matches()) {
+                String orderToken = payMatcher.group(1);
+                return replyPayForSpecificOrder(customer, phone, orderToken);
+            }
+            return replyPay(customer, phone);
+        }
+        // Pay: list unpaid orders or pay for specific order
         if (lower.startsWith("pay") || lower.contains("pay now") || lower.contains("payment")) {
             var payMatcher = PAY_ORDER.matcher(message.trim());
             if (payMatcher.matches()) {
                 String orderToken = payMatcher.group(1);
                 return replyPayForSpecificOrder(customer, phone, orderToken);
             }
-            // No specific order number provided: list pending orders with their numbers
             return replyPay(customer, phone);
         }
         // Delivery / shipment status
@@ -303,7 +311,7 @@ public class WhatsAppChatbotService {
         sb.append("1. Shops – reply SHOPS to browse by shop\n");
         sb.append("2. Check stock – reply STOCK or STOCK <shop name or number>\n");
         sb.append("3. My orders – reply ORDER\n");
-        sb.append("4. Pay for order – reply PAY to see pending orders, then PAY <order number>\n");
+        sb.append("4. Unpaid orders / Pay – reply PAY or UNPAID to see orders to pay, then PAY <order number> (e.g. PAY ORD-WA-123)\n");
         sb.append("5. Delivery status – reply DELIVERY\n\n");
         if (customer == null) {
             sb.append("Register at ").append(storefrontUrl).append(" with your phone to place orders.");
@@ -440,9 +448,12 @@ public class WhatsAppChatbotService {
         sb.append("Your orders:\n\n");
         for (int i = 0; i < limit; i++) {
             Order o = orders.get(i);
-            sb.append("• #").append(o.getOrderNumber()).append(" – ").append(o.getOrderStatus()).append(" – KES ").append(o.getTotalAmount()).append("\n");
+            boolean hasUnpaid = paymentRepository.findByOrderAndPaymentStatus(o, "pending").isPresent();
+            sb.append("• #").append(o.getOrderNumber()).append(" – ").append(o.getOrderStatus());
+            if (hasUnpaid) sb.append(" (unpaid)");
+            sb.append(" – KES ").append(o.getTotalAmount()).append("\n");
         }
-        sb.append("\nReply PAY to see pending orders, then PAY <order number> to pay for a specific order (e.g. PAY ")
+        sb.append("\nTo pay for an unpaid order: reply PAY to see unpaid orders, then PAY <order number> (e.g. PAY ")
                 .append(orders.get(0).getOrderNumber())
                 .append("). Reply DELIVERY for shipment status, or MENU for main menu.");
         return sb.toString();
@@ -507,25 +518,26 @@ public class WhatsAppChatbotService {
 
     private String replyPay(User customer, String phone) {
         List<Order> orders = orderRepository.findByUserIdOrderByOrderedAtDesc(customer.getUserId());
-        List<Order> pendingOrders = orders.stream()
+        List<Order> unpaidOrders = orders.stream()
                 .filter(o -> "pending".equalsIgnoreCase(o.getOrderStatus()))
+                .filter(o -> paymentRepository.findByOrderAndPaymentStatus(o, "pending").isPresent())
                 .collect(Collectors.toList());
-        if (pendingOrders.isEmpty()) {
-            return "You have no pending orders. Reply ORDER to see your orders or place one.";
+        if (unpaidOrders.isEmpty()) {
+            return "You have no unpaid orders. Reply ORDER to see your orders, or place one via STOCK/SHOPS or at " + storefrontUrl + ".";
         }
-        int limit = Math.min(pendingOrders.size(), MAX_ORDERS_IN_REPLY);
+        int limit = Math.min(unpaidOrders.size(), MAX_ORDERS_IN_REPLY);
         StringBuilder sb = new StringBuilder();
-        sb.append("You have pending orders:\n\n");
+        sb.append("Unpaid orders:\n\n");
         for (int i = 0; i < limit; i++) {
-            Order o = pendingOrders.get(i);
+            Order o = unpaidOrders.get(i);
             sb.append("• #").append(o.getOrderNumber()).append(" – KES ").append(o.getTotalAmount()).append("\n");
         }
-        if (pendingOrders.size() > limit) {
-            sb.append("\n... and ").append(pendingOrders.size() - limit).append(" more pending orders.\n");
+        if (unpaidOrders.size() > limit) {
+            sb.append("\n... and ").append(unpaidOrders.size() - limit).append(" more unpaid orders.\n");
         }
-        sb.append("\nReply PAY <order number> to pay for one of these (e.g. PAY ")
-                .append(pendingOrders.get(0).getOrderNumber())
-                .append("). Reply ORDER to see full details, or MENU for main menu.");
+        sb.append("\nReply PAY <order number> to pay (e.g. PAY ")
+                .append(unpaidOrders.get(0).getOrderNumber())
+                .append("). Reply ORDER to see all orders, or MENU for main menu.");
         return sb.toString();
     }
 
@@ -581,7 +593,10 @@ public class WhatsAppChatbotService {
             }
             for (Shipment s : shipments) {
                 String status = s.getStatus() != null ? s.getStatus() : "CREATED";
-                lines.add("Order #" + order.getOrderNumber() + " – " + formatShipmentStatus(status));
+                String line = "Order #" + order.getOrderNumber() + " – " + formatShipmentStatus(status);
+                String details = formatShipmentDetails(s);
+                if (!details.isEmpty()) line += " (" + details + ")";
+                lines.add(line);
                 count++;
                 if (count >= MAX_ORDERS_IN_REPLY) break;
             }
@@ -593,10 +608,27 @@ public class WhatsAppChatbotService {
     }
 
     private static String formatShipmentStatus(String status) {
-        if ("CREATED".equalsIgnoreCase(status)) return "Order Shipped";
-        if ("IN_TRANSIT".equalsIgnoreCase(status) || "OUT_FOR_DELIVERY".equalsIgnoreCase(status)) return "Out for Delivery";
+        if ("CREATED".equalsIgnoreCase(status)) return "Dispatched";
+        if ("IN_TRANSIT".equalsIgnoreCase(status) || "OUT_FOR_DELIVERY".equalsIgnoreCase(status) || "SHIPPED".equalsIgnoreCase(status)) return "Out for Delivery";
         if ("DELIVERED".equalsIgnoreCase(status) || "COLLECTED".equalsIgnoreCase(status)) return "Delivered!";
         return status;
+    }
+
+    private static String formatShipmentDetails(Shipment s) {
+        StringBuilder sb = new StringBuilder();
+        if (s.getCourierService() != null && !s.getCourierService().isBlank()) {
+            sb.append(s.getCourierService());
+            if (s.getTrackingNumber() != null && !s.getTrackingNumber().isBlank()) sb.append(" ").append(s.getTrackingNumber());
+        }
+        if (s.getRiderVehicle() != null && !s.getRiderVehicle().isBlank()) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append("Reg: ").append(s.getRiderVehicle());
+        }
+        if (s.getRiderName() != null && !s.getRiderName().isBlank()) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(s.getRiderName());
+        }
+        return sb.toString();
     }
 
     private static final class PendingLinkState {
