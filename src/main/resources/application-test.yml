@@ -1,0 +1,24 @@
+# UAT (test) profile – biasharahub-app-test / biasharahub-api-test
+# Use with SPRING_PROFILES_ACTIVE=test (e.g. Elastic Beanstalk UAT).
+# Override any value with environment variables.
+
+server:
+  port: ${SERVER_PORT:5000}
+
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    root: INFO
+    com.biasharahub: DEBUG
+
+app:
+  frontend-url: ${APP_FRONTEND_URL:https://biasharahub-app-test.sysnovatechnologies.com}
+  oauth2:
+    backend-base-url: ${OAUTH2_BACKEND_BASE_URL:https://biasharahub-api-test.sysnovatechnologies.com/api}
+    frontend-redirect-uri: ${OAUTH2_FRONTEND_REDIRECT_URI:https://biasharahub-app-test.sysnovatechnologies.com/auth/callback}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:https://biasharahub-app-test.sysnovatechnologies.com}
+  storefront-url: ${STOREFRONT_URL:https://biasharahub-app-test.sysnovatechnologies.com}

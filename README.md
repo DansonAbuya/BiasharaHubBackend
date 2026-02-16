@@ -4,7 +4,7 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
 
 **@ [Sysnova Technologies](https://sysnovatechnologies.com).**
 
-**This repository is backend-only.** The frontend lives in a separate project (e.g. **BisharaHubFrontend**) and must run on its own. The two interact **only via HTTP API calls**: frontend at `http://localhost:3000` (or your dev URL) calls this API at `http://localhost:5050/api`. CORS is configured to allow the frontend origin.
+**This repository is backend-only.** The frontend lives in a separate project (e.g. **BisharaHubFrontend**) and must run on its own. The two interact **only via HTTP API calls**: frontend calls this API (local: `http://localhost:5050/api`; UAT: `https://biasharahub-api-test.sysnovatechnologies.com/api`; prod: `https://biasharahub-api.sysnovatechnologies.com/api`). CORS allows localhost and the UAT/prod frontend origins.
 
 ## Tech Stack
 
@@ -22,35 +22,26 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
 
 ## Setup
 
-1. **Initialize the database** (creates `biasharahub` if it doesn't exist):
-   - **Windows (CMD):** `scripts\init-database.bat`
-   - **Windows (PowerShell):** `.\scripts\init-database.ps1`
-   - **Linux/Mac:** `./scripts/init-database.sh`
-   - **Maven:** `mvn validate -Pinit-db` or `mvn spring-boot:run -Pinit-db` (runs init before start)
-   - **Manual:** `psql -U postgres -h localhost -f scripts/init-database.sql`
+1. **Create the database** (use the database name from your environment):
+   - **Local:** Create a database (e.g. `biasharahub`) manually: `psql -U postgres -c "CREATE DATABASE biasharahub;"`
+   - **UAT/Prod:** Use the database configured in your environment (e.g. `biasharahub_test`, `biasharahub`). Set `DB_URL` accordingly.
 
-2. **Set default schema (one-time, security best practice):**  
-   The app relies on the server default schema instead of the JDBC URL. Run as a DB admin (e.g. `postgres`):
-   ```bash
-   psql -U postgres -h localhost -d biasharahub -f src/main/resources/db/scripts/set-default-schema.sql
-   ```
-   Or run the `ALTER DATABASE biasharahub SET search_path TO public;` statement from that file in any SQL client. New connections will then use `public` by default.
+2. **Set default schema (one-time, optional):**  
+   See `src/main/resources/db/scripts/set-default-schema.sql`. Replace `YOUR_DATABASE` with your database name and run the `ALTER DATABASE` statement.
 
-3. **Configure environment** (required if your PostgreSQL password is not `postgres`):
+3. **Configure environment:**
    ```bash
+   # Required: DB_URL must point to your database (used in UAT/Prod; defaults to localhost/biasharahub for local)
    # Windows (PowerShell)
+   $env:DB_URL="jdbc:postgresql://localhost:5432/biasharahub"
    $env:DB_USERNAME="postgres"
    $env:DB_PASSWORD="your_postgres_password"
 
-   # Windows (CMD)
-   set DB_USERNAME=postgres
-   set DB_PASSWORD=your_postgres_password
-
    # Linux/Mac
-   export DB_USERNAME=postgres
-   export DB_PASSWORD=your_postgres_password
+   export DB_URL="jdbc:postgresql://localhost:5432/biasharahub"
+   export DB_USERNAME="postgres"
+   export DB_PASSWORD="your_postgres_password"
    ```
-   The app auto-creates the `biasharahub` database on startup if it doesn't exist. Set `DB_SKIP_BOOTSTRAP=true` to disable this.
 
 4. **Add logo and favicon:**
    Copy `logo.png` and `favicon.png` to `src/main/resources/static/`
@@ -61,7 +52,7 @@ Spring Boot REST API for the BiasharaHub multi-tenant SME commerce platform.
    mvn spring-boot:run
    ```
 
-6. **API base URL:** `http://localhost:8080/api`
+6. **API base URL:** Local `http://localhost:5050/api`; UAT `https://biasharahub-api-test.sysnovatechnologies.com/api`; prod `https://biasharahub-api.sysnovatechnologies.com/api`
 
 ## Multi-Tenancy (Schema per Tenant)
 
@@ -178,7 +169,7 @@ When enabled, the app publishes to Kafka when an order is created and when a pay
 1. In [Google Cloud Console](https://console.cloud.google.com/) create (or use) a project and enable the **Google+ API** (or **Google Identity**).
 2. Under **APIs & Services → Credentials**, create an **OAuth 2.0 Client ID** (type **Web application**).
 3. Set **Authorized redirect URIs** to your backend callback URL, e.g.:
-   - Local: `http://localhost:5050/api/auth/oauth2/callback`
+   - Local: `http://localhost:5050/api/auth/oauth2/callback`; UAT: `https://biasharahub-api-test.sysnovatechnologies.com/api/auth/oauth2/callback`; prod: `https://biasharahub-api.sysnovatechnologies.com/api/auth/oauth2/callback`
    - Production: `https://your-api.example.com/api/auth/oauth2/callback`
 4. Set environment variables (or `application.yml`):
 
@@ -186,8 +177,8 @@ When enabled, the app publishes to Kafka when an order is created and when a pay
 |----------|-------------|
 | `GOOGLE_CLIENT_ID` | OAuth 2.0 client ID from Google |
 | `GOOGLE_CLIENT_SECRET` | OAuth 2.0 client secret |
-| `OAUTH2_BACKEND_BASE_URL` | Backend base URL (default `http://localhost:5050/api`) |
-| `OAUTH2_FRONTEND_REDIRECT_URI` | Frontend URL after OAuth (default `http://localhost:3000/auth/callback`) |
+| `OAUTH2_BACKEND_BASE_URL` | Backend base URL (local default `http://localhost:5050/api`; test/prod use application-test.yml / application-prod.yml) |
+| `OAUTH2_FRONTEND_REDIRECT_URI` | Frontend URL after OAuth (local default `http://localhost:3000/auth/callback`; UAT/prod in profile yml) |
 
 **Example (PowerShell):**
 ```powershell
