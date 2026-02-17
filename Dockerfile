@@ -21,9 +21,6 @@ USER app
 
 COPY --from=builder /build/target/app.jar ./app.jar
 
-# Env vars: set DB_URL, DB_USERNAME, DB_PASSWORD, REDIS_HOST, REDIS_PORT, etc. at runtime
-ENV SERVER_PORT=5050
-
 EXPOSE 5050
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
