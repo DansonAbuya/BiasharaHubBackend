@@ -13,7 +13,7 @@ import java.util.UUID;
  */
 @Component
 @ConditionalOnExpression(
-        "${app.messaging.in-process.enabled:true} && !${app.kafka.enabled:false}"
+        "#{environment.getProperty('app.messaging.in-process.enabled', 'true').equals('true') && !environment.getProperty('app.kafka.enabled', 'false').equals('true')}"
 )
 public class InProcessOrderEventPublisher implements OrderEventPublisher {
 
