@@ -52,6 +52,17 @@ public class AuthController {
         return ResponseEntity.status(401).body(Map.of("error", "Invalid email or password"));
     }
 
+    /**
+     * Stateless logout endpoint.
+     * For JWT-based auth we don't keep server-side sessions; the frontend is responsible
+     * for removing access/refresh tokens from storage. This endpoint exists so the
+     * frontend can always get a quick 200/204 response and update its UI.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/verify-code")
     public ResponseEntity<?> verifyCode(@Valid @RequestBody VerifyCodeRequest request) {
         Optional<LoginResponse> result = authService.verifyCode(request);
