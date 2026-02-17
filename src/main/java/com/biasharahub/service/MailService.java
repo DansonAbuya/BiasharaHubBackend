@@ -60,6 +60,21 @@ public class MailService {
     }
 
     /**
+     * Send verification code for WhatsApp sign-up. Used when a new user is registering via WhatsApp.
+     */
+    public void sendWhatsAppSignupCode(@NonNull String toEmail, @NonNull String name, @NonNull String code) {
+        String text = """
+                Hi %s,
+
+                Your BiasharaHub sign-up verification code is: %s
+
+                Enter this code in the WhatsApp chat to complete your registration. This code expires in 10 minutes.
+                If you did not request this, you can safely ignore this email.
+                """.formatted(name, code);
+        send(toEmail, "Your BiasharaHub sign-up code", text);
+    }
+
+    /**
      * Send a generic email (e.g. password reset, notifications). Tenant from context.
      */
     public void send(@NonNull String toEmail, @NonNull String subject, @NonNull String textBody) {

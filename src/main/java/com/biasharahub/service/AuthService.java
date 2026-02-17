@@ -75,6 +75,29 @@ public class AuthService {
                 .build();
     }
 
+    /**
+     * Create a customer account from WhatsApp sign-up (email verified via code in WhatsApp).
+     * Uses a random password; user can reset it later via "Forgot password" on the web app.
+     */
+    @Transactional
+    public User registerCustomerViaWhatsApp(String email, String name, String phone) {
+        if (userRepository.existsByEmail(email.toLowerCase())) {
+            throw new IllegalArgumentException("Email already registered");
+        }
+        String randomPassword = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "").substring(0, 4);
+        User user = User.builder()
+                .email(email.toLowerCase())
+                .passwordHash(passwordEncoder.encode(randomPassword))
+                .name(name != null ? name.trim() : "Customer")
+                .role("customer")
+                .twoFactorEnabled(false)
+                .build();
+        if (phone != null && !phone.isBlank()) {
+            user.setPhone(phone.trim());
+        }
+        return userRepository.save(user);
+    }
+
     @Transactional
     public Optional<LoginResponse> login(LoginRequest request) {
         return userRepository.findByEmail(request.getEmail().toLowerCase())
