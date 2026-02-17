@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -51,6 +52,8 @@ public class WhatsAppChatbotService {
     private final OrderEventPublisher orderEventPublisher;
     private final VerificationCodeService verificationCodeService;
     private final VerificationCodeRepository verificationCodeRepository;
+    private final AuthService authService;
+    private final MailService mailService;
 
     @Value("${app.storefront-url:https://biasharahub.com}")
     private String storefrontUrl;
@@ -142,15 +145,24 @@ public class WhatsAppChatbotService {
             state = null;
         }
 
-        // No state: first time or expired – ask for email
+        // No state: first time or expired – offer link or sign up
         if (state == null) {
+            String trimmed = message.trim();
+            if ("signup".equalsIgnoreCase(trimmed) || "register".equalsIgnoreCase(trimmed)) {
+                linkStateByPhone.put(phone, new PendingLinkState(PendingLinkState.State.AWAITING_SIGNUP_EMAIL, null, null, Instant.now().plusSeconds(LINK_STATE_TTL_SECONDS)));
+                return "Create a new account: reply with your *email* (e.g. you@example.com).";
+            }
             linkStateByPhone.put(phone, new PendingLinkState(PendingLinkState.State.AWAITING_EMAIL, null, null, Instant.now().plusSeconds(LINK_STATE_TTL_SECONDS)));
-            return "Hi! We don't have your WhatsApp number on file. Reply with your *account email* to link this number to your BiasharaHub account.";
+            return "Hi! We don't have your WhatsApp number on file. Reply with your *account email* to link, or type *SIGNUP* to create a new account.";
         }
 
         if (state.state == PendingLinkState.State.AWAITING_EMAIL) {
             if ("done".equalsIgnoreCase(message.trim())) {
                 return "Reply with your account email (e.g. you@example.com) to link this number.";
+            }
+            if ("signup".equalsIgnoreCase(message.trim()) || "register".equalsIgnoreCase(message.trim())) {
+                linkStateByPhone.put(phone, new PendingLinkState(PendingLinkState.State.AWAITING_SIGNUP_EMAIL, null, null, Instant.now().plusSeconds(LINK_STATE_TTL_SECONDS)));
+                return "Create a new account: reply with your *email* (e.g. you@example.com).";
             }
             if (EMAIL_LIKE.matcher(message).matches()) {
                 String email = message.trim().toLowerCase();
@@ -186,6 +198,54 @@ public class WhatsAppChatbotService {
             }
             linkStateByPhone.put(phone, new PendingLinkState(PendingLinkState.State.AWAITING_EMAIL, null, null, Instant.now().plusSeconds(LINK_STATE_TTL_SECONDS)));
             return "Invalid or expired code. Reply with your *email* to get a new code.";
+        }
+
+        // ----- Sign-up flow -----
+        if (state.state == PendingLinkState.State.AWAITING_SIGNUP_EMAIL) {
+            if (EMAIL_LIKE.matcher(message.trim()).matches()) {
+                String email = message.trim().toLowerCase();
+                if (userRepository.findByEmail(email).filter(u -> "customer".equalsIgnoreCase(u.getRole())).isPresent()) {
+                    return "This email is already registered. Reply with your *account email* to link this number, or type *SIGNUP* with a different email to create a new account.";
+                }
+                linkStateByPhone.put(phone, new PendingLinkState(PendingLinkState.State.AWAITING_SIGNUP_NAME, email, null, Instant.now().plusSeconds(LINK_STATE_TTL_SECONDS)));
+                return "Reply with your *full name* to continue.";
+            }
+            return "Please reply with a valid email (e.g. you@example.com) to create your account.";
+        }
+
+        if (state.state == PendingLinkState.State.AWAITING_SIGNUP_NAME) {
+            String name = message.trim();
+            if (name.length() < 2) {
+                return "Please reply with your full name (at least 2 characters).";
+            }
+            String code = String.valueOf((int) (Math.random() * 900_000) + 100_000);
+            Instant codeExpires = Instant.now().plus(10, ChronoUnit.MINUTES);
+            try {
+                mailService.sendWhatsAppSignupCode(state.email, name, code);
+            } catch (Exception e) {
+                log.warn("Failed to send WhatsApp signup code to {}: {}", state.email, e.getMessage());
+                return "We couldn't send the code. Please try again in a moment or contact support.";
+            }
+            linkStateByPhone.put(phone, new PendingLinkState(PendingLinkState.State.AWAITING_SIGNUP_CODE, state.email, null, state.expiresAt, name, code, codeExpires));
+            return "We sent a 6-digit code to your email. Reply with that code here to complete sign-up.";
+        }
+
+        if (state.state == PendingLinkState.State.AWAITING_SIGNUP_CODE) {
+            if (SIX_DIGITS.matcher(message.trim()).matches()) {
+                String code = message.trim();
+                if (state.signupCode != null && state.signupCode.equals(code) && state.signupCodeExpiresAt != null && state.signupCodeExpiresAt.isAfter(Instant.now())) {
+                    try {
+                        User user = authService.registerCustomerViaWhatsApp(state.email, state.name, phone);
+                        linkStateByPhone.remove(phone);
+                        return "Welcome, " + (user.getName() != null ? user.getName() : "there") + "! You're all set. " + buildMenu(user);
+                    } catch (IllegalArgumentException e) {
+                        linkStateByPhone.put(phone, new PendingLinkState(PendingLinkState.State.AWAITING_SIGNUP_EMAIL, null, null, Instant.now().plusSeconds(LINK_STATE_TTL_SECONDS)));
+                        return "That email is already registered. Reply with your *email* to link this number, or try another email to sign up.";
+                    }
+                }
+            }
+            linkStateByPhone.put(phone, new PendingLinkState(PendingLinkState.State.AWAITING_SIGNUP_EMAIL, null, null, Instant.now().plusSeconds(LINK_STATE_TTL_SECONDS)));
+            return "Invalid or expired code. Reply with your *email* to start sign-up again and get a new code.";
         }
 
         linkStateByPhone.remove(phone);
@@ -632,17 +692,30 @@ public class WhatsAppChatbotService {
     }
 
     private static final class PendingLinkState {
-        enum State { AWAITING_EMAIL, AWAITING_CODE }
+        enum State { AWAITING_EMAIL, AWAITING_CODE, AWAITING_SIGNUP_EMAIL, AWAITING_SIGNUP_NAME, AWAITING_SIGNUP_CODE }
         final State state;
         final String email;
         final UUID userId;
         final Instant expiresAt;
+        /** For sign-up flow: display name */
+        final String name;
+        /** For sign-up flow: 6-digit code sent to email */
+        final String signupCode;
+        /** For sign-up flow: code expiry */
+        final Instant signupCodeExpiresAt;
 
         PendingLinkState(State state, String email, UUID userId, Instant expiresAt) {
+            this(state, email, userId, expiresAt, null, null, null);
+        }
+
+        PendingLinkState(State state, String email, UUID userId, Instant expiresAt, String name, String signupCode, Instant signupCodeExpiresAt) {
             this.state = state;
             this.email = email;
             this.userId = userId;
             this.expiresAt = expiresAt;
+            this.name = name;
+            this.signupCode = signupCode;
+            this.signupCodeExpiresAt = signupCodeExpiresAt;
         }
     }
 }
