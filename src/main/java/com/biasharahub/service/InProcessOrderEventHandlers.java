@@ -27,6 +27,7 @@ public class InProcessOrderEventHandlers {
     private final ShipmentRepository shipmentRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final InAppNotificationService inAppNotificationService;
+    private final SmsNotificationService smsNotificationService;
 
     @Async
     @Transactional
