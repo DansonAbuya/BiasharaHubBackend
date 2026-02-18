@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -28,6 +29,7 @@ public class InProcessOrderEventHandlers {
     private final InAppNotificationService inAppNotificationService;
 
     @Async
+    @Transactional
     public void onOrderCreated(UUID orderId, String orderNumber, UUID customerId, BigDecimal total) {
         try {
             log.info("In-process: order created orderId={}, orderNumber={}, customerId={}, total={}",
@@ -51,6 +53,7 @@ public class InProcessOrderEventHandlers {
     }
 
     @Async
+    @Transactional
     public void onPaymentCompleted(UUID orderId, UUID paymentId) {
         try {
             log.info("In-process: payment completed orderId={}, paymentId={}", orderId, paymentId);
