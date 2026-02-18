@@ -55,7 +55,7 @@ public class WhatsAppChatbotService {
     private final AuthService authService;
     private final MailService mailService;
 
-    @Value("${app.storefront-url:https://biasharahub.com}")
+    @Value("${app.storefront-url:https://biasharahub-app.sysnovatechnologies.com}")
     private String storefrontUrl;
 
     /** Pending WhatsApp link: phone not in DB, user is providing email then code to link. Expires after 15 min. */
