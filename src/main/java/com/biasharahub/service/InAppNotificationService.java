@@ -5,6 +5,7 @@ import com.biasharahub.entity.Order;
 import com.biasharahub.entity.Payment;
 import com.biasharahub.entity.Shipment;
 import com.biasharahub.entity.User;
+import com.biasharahub.entity.OrderItem;
 import com.biasharahub.repository.NotificationRepository;
 import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.UserRepository;
@@ -38,6 +39,42 @@ public class InAppNotificationService {
                 "Order placed",
                 "Your order " + order.getOrderNumber() + " has been placed. Complete payment to confirm.",
                 "/dashboard/orders");
+    }
+
+    /**
+     * Notify the seller (owner + staff) when a new order is placed for their shop.
+     * This mirrors the customer "order placed" notification but is targeted at the seller side.
+     */
+    public void notifySellerOrderCreated(Order order) {
+        if (order == null || order.getItems() == null || order.getItems().isEmpty()) {
+            return;
+        }
+        OrderItem firstItem = order.getItems().get(0);
+        if (firstItem == null || firstItem.getProduct() == null || firstItem.getProduct().getBusinessId() == null) {
+            return;
+        }
+        java.util.UUID businessId = firstItem.getProduct().getBusinessId();
+
+        java.util.List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
+        java.util.List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        if ((owners == null || owners.isEmpty()) && (staff == null || staff.isEmpty())) {
+            return;
+        }
+
+        String customerName = order.getUser() != null && order.getUser().getName() != null
+                ? order.getUser().getName()
+                : "a customer";
+        String title = "New order received";
+        String message = "You have received a new order " + order.getOrderNumber()
+                + " from " + customerName + ".";
+        String actionUrl = "/dashboard/orders";
+
+        for (User u : owners) {
+            saveNotification(u, "order", title, message, actionUrl);
+        }
+        for (User u : staff) {
+            saveNotification(u, "order", title, message, actionUrl);
+        }
     }
 
     public void notifyPaymentRequested(Order order, Payment payment) {

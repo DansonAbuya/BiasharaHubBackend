@@ -63,6 +63,12 @@ public class PaymentController {
         if (payment == null) {
             return ResponseEntity.status(404).<PaymentInitiateResponse>build();
         }
+        if ("Cash".equalsIgnoreCase(payment.getPaymentMethod())) {
+            return ResponseEntity.badRequest()
+                    .body(PaymentInitiateResponse.builder()
+                            .message("This order is pay-by-cash. The seller will confirm payment when you pay in cash.")
+                            .build());
+        }
 
         String accountRef = order.getOrderNumber();
         String desc = "BiasharaHub order payment";
@@ -144,9 +150,10 @@ public class PaymentController {
         }
         String method = body != null ? body.get("paymentMethod") : null;
         if (method == null || method.isBlank()) {
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", "paymentMethod is required (M-Pesa or Bank)"));
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "paymentMethod is required (M-Pesa, Cash, or Bank)"));
         }
-        String normalized = "bank".equalsIgnoreCase(method.trim()) ? "Bank" : "M-Pesa";
+        String m = method.trim().toLowerCase();
+        String normalized = "bank".equals(m) ? "Bank" : "cash".equals(m) ? "Cash" : "M-Pesa";
         return paymentRepository.findById(paymentId)
                 .filter(p -> p.getOrder().getOrderId().equals(orderId))
                 .map(payment -> {

@@ -148,12 +148,14 @@ public class OrderController {
         order.setTotalAmount(total);
         order = orderRepository.save(order);
 
+        String paymentMethod = request.getPaymentMethod() != null && "cash".equalsIgnoreCase(request.getPaymentMethod().trim())
+                ? "Cash" : "M-Pesa";
         Payment payment = Payment.builder()
                 .order(order)
                 .user(orderOwner)
                 .amount(total)
                 .paymentStatus("pending")
-                .paymentMethod("M-Pesa")
+                .paymentMethod(paymentMethod)
                 .build();
         paymentRepository.save(payment);
 
@@ -249,7 +251,11 @@ public class OrderController {
                 .filter(p -> "completed".equals(p.getPaymentStatus()))
                 .findFirst()
                 .map(Payment::getPaymentMethod)
-                .orElse(null);
+                .orElse(o.getPayments().stream()
+                        .filter(p -> "pending".equals(p.getPaymentStatus()))
+                        .findFirst()
+                        .map(Payment::getPaymentMethod)
+                        .orElse(null));
         UUID paymentId = o.getPayments().stream()
                 .filter(p -> "pending".equals(p.getPaymentStatus()))
                 .findFirst()
