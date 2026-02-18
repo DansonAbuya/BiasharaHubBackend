@@ -46,6 +46,22 @@ public class InProcessOrderEventHandlers {
                 } catch (Exception e) {
                     log.warn("Failed to create in-app order-created notification for {}: {}", orderId, e.getMessage());
                 }
+                // Notify seller (owner + staff): in-app, WhatsApp, SMS
+                try {
+                    inAppNotificationService.notifySellerOrderCreated(order);
+                } catch (Exception e) {
+                    log.warn("Failed to create in-app seller order notification for {}: {}", orderId, e.getMessage());
+                }
+                try {
+                    whatsAppNotificationService.notifySellerOrderCreated(order);
+                } catch (Exception e) {
+                    log.warn("Failed to send WhatsApp seller order notification for {}: {}", orderId, e.getMessage());
+                }
+                try {
+                    smsNotificationService.notifySellerOrderCreated(order);
+                } catch (Exception e) {
+                    log.warn("Failed to send SMS seller order notification for {}: {}", orderId, e.getMessage());
+                }
             });
         } catch (Exception e) {
             log.warn("In-process order.created handler failed for order {}: {}", orderId, e.getMessage());

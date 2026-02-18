@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -50,14 +51,39 @@ public class ShipmentController {
     }
 
     @GetMapping("/order/{orderId}")
+    @Transactional(readOnly = false)
     public ResponseEntity<List<ShipmentDto>> getShipmentsByOrder(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable UUID orderId) {
         if (user == null) return ResponseEntity.status(401).<List<ShipmentDto>>build();
         return orderRepository.findById(orderId)
-                .map(order -> ResponseEntity.ok(
-                        shipmentRepository.findByOrder(order).stream().map(this::toDto).toList()))
+                .map(order -> {
+                    List<Shipment> list = shipmentRepository.findByOrder(order);
+                    if (list.isEmpty() && "confirmed".equalsIgnoreCase(order.getOrderStatus())) {
+                        ensureShipmentForConfirmedOrder(order);
+                        list = shipmentRepository.findByOrder(order);
+                    }
+                    return ResponseEntity.ok(list.stream().map(this::toDto).toList());
+                })
                 .orElse(ResponseEntity.status(404).<List<ShipmentDto>>build());
+    }
+
+    /** Create a shipment for a confirmed order that has none (e.g. cash-confirmed orders where async handler failed). */
+    private void ensureShipmentForConfirmedOrder(Order order) {
+        if (order == null) return;
+        String deliveryMode = order.getDeliveryMode() != null ? order.getDeliveryMode() : "SELLER_SELF";
+        String otp = null;
+        if ("SELLER_SELF".equalsIgnoreCase(deliveryMode) || "CUSTOMER_PICKUP".equalsIgnoreCase(deliveryMode)) {
+            otp = generateOtp();
+        }
+        Shipment shipment = Shipment.builder()
+                .order(order)
+                .deliveryMode(deliveryMode)
+                .status("CREATED")
+                .otpCode(otp)
+                .build();
+        shipmentRepository.save(shipment);
+        log.info("Created missing shipment for confirmed order {} (e.g. cash-confirmed)", order.getOrderId());
     }
 
     @PostMapping
