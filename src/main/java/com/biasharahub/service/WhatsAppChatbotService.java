@@ -320,7 +320,8 @@ public class WhatsAppChatbotService {
                 List<UUID> productIds = lastProductIdsByPhone.get(phone);
                 if (productIds != null && listNum >= 1 && listNum <= productIds.size()) {
                     UUID productId = productIds.get(listNum - 1);
-                    return createOrderAndReply(customer, productId, qty);
+                    boolean payCash = lower.endsWith(" cash");
+                    return createOrderAndReply(customer, productId, qty, payCash ? "Cash" : "M-Pesa");
                 }
                 return "View a product list first: reply 1 for Shops, pick a shop, then reply ORDER <number> <qty> (e.g. ORDER 1 2). Or reply MENU for main menu.";
             }
@@ -330,7 +331,8 @@ public class WhatsAppChatbotService {
                     try {
                         UUID productId = UUID.fromString(matcher.group(1));
                         int qty = Integer.parseInt(matcher.group(2));
-                        return createOrderAndReply(customer, productId, qty);
+                        boolean payCash = lower.endsWith(" cash");
+                        return createOrderAndReply(customer, productId, qty, payCash ? "Cash" : "M-Pesa");
                     } catch (Exception e) {
                         log.warn("WhatsApp order parse failed: {}", e.getMessage());
                     }
@@ -521,6 +523,11 @@ public class WhatsAppChatbotService {
 
     @Transactional
     public String createOrderAndReply(User customer, UUID productId, int qty) {
+        return createOrderAndReply(customer, productId, qty, "M-Pesa");
+    }
+
+    @Transactional
+    public String createOrderAndReply(User customer, UUID productId, int qty, String paymentMethod) {
         Product product = productRepository.findByProductIdWithImages(productId).orElse(null);
         if (product == null) {
             return "Product not found. Reply STOCK to see available products.";
@@ -531,10 +538,14 @@ public class WhatsAppChatbotService {
             return "Insufficient stock for " + product.getName() + ". Available: " + available + ". Reply STOCK to see all.";
         }
         try {
-            Order order = createOrderForCustomer(customer, product, qty);
+            Order order = createOrderForCustomer(customer, product, qty, paymentMethod != null && "Cash".equalsIgnoreCase(paymentMethod) ? "Cash" : "M-Pesa");
             orderEventPublisher.orderCreated(order);
+            if ("Cash".equalsIgnoreCase(paymentMethod)) {
+                return "Order Confirmed! Order #" + order.getOrderNumber() + " – KES " + order.getTotalAmount()
+                        + ". Pay in cash when you receive. The seller will confirm payment in the system. Reply ORDER to see your orders.";
+            }
             return "Order Confirmed! Order #" + order.getOrderNumber() + " – KES " + order.getTotalAmount() + ". Reply PAY "
-                    + order.getOrderNumber() + " to pay now.";
+                    + order.getOrderNumber() + " to pay now with M-Pesa.";
         } catch (Exception e) {
             log.warn("WhatsApp order creation failed: {}", e.getMessage());
             return "Could not create order. Please try again or visit " + storefrontUrl;
@@ -542,6 +553,10 @@ public class WhatsAppChatbotService {
     }
 
     private Order createOrderForCustomer(User customer, Product product, int qty) {
+        return createOrderForCustomer(customer, product, qty, "M-Pesa");
+    }
+
+    private Order createOrderForCustomer(User customer, Product product, int qty, String paymentMethod) {
         String orderNumber = "ORD-WA-" + System.currentTimeMillis();
         BigDecimal price = product.getPrice();
         BigDecimal total = price.multiply(BigDecimal.valueOf(qty));
@@ -565,12 +580,13 @@ public class WhatsAppChatbotService {
         order = orderRepository.save(order);
         product.setQuantity(product.getQuantity() - qty);
         productRepository.save(product);
+        String method = "Cash".equalsIgnoreCase(paymentMethod) ? "Cash" : "M-Pesa";
         Payment payment = Payment.builder()
                 .order(order)
                 .user(customer)
                 .amount(total)
                 .paymentStatus("pending")
-                .paymentMethod("M-Pesa")
+                .paymentMethod(method)
                 .build();
         paymentRepository.save(payment);
         return order;
@@ -621,6 +637,9 @@ public class WhatsAppChatbotService {
         Payment payment = paymentRepository.findByOrderAndPaymentStatus(order, "pending").orElse(null);
         if (payment == null) {
             return "Order #" + order.getOrderNumber() + " has no pending payment. Reply ORDER for other orders.";
+        }
+        if ("Cash".equalsIgnoreCase(payment.getPaymentMethod())) {
+            return "Order #" + order.getOrderNumber() + " is pay-by-cash. Pay the seller when you receive. They will confirm payment in the system. Reply ORDER to see your orders.";
         }
         String phoneForMpesa = phone.replaceAll("\\D", "");
         if (phoneForMpesa.startsWith("254")) {

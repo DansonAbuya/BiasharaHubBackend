@@ -34,6 +34,12 @@ public class CreateOrderRequest {
      */
     private BigDecimal shippingFee;
 
+    /**
+     * Payment method: "M-Pesa" or "Cash". Default "M-Pesa".
+     * Cash: customer pays in cash; seller confirms payment in the system.
+     */
+    private String paymentMethod;
+
     /** When staff/owner place an order on behalf of a customer, set this to the customer's user ID. */
     private java.util.UUID orderForCustomerId;
 
