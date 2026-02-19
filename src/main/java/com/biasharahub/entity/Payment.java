@@ -1,5 +1,6 @@
 package com.biasharahub.entity;
 
+import com.biasharahub.config.EncryptedStringAttributeConverter;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -32,7 +33,8 @@ public class Payment {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "transaction_id")
+    @Convert(converter = EncryptedStringAttributeConverter.class)
+    @Column(name = "transaction_id", columnDefinition = "TEXT")
     private String transactionId;
 
     @Column(name = "payment_status", nullable = false)

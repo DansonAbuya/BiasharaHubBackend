@@ -1,5 +1,6 @@
 package com.biasharahub.entity;
 
+import com.biasharahub.config.EncryptedStringAttributeConverter;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -47,4 +48,17 @@ public class Tenant {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    /**
+     * Default payout method for auto-payout on delivery: MPESA or BANK_TRANSFER.
+     */
+    @Column(name = "default_payout_method", length = 32)
+    private String defaultPayoutMethod;
+
+    /**
+     * Default payout destination (encrypted): M-Pesa phone or bank account details.
+     */
+    @Convert(converter = EncryptedStringAttributeConverter.class)
+    @Column(name = "default_payout_destination", length = 1024)
+    private String defaultPayoutDestination;
 }

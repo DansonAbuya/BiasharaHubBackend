@@ -38,17 +38,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = extractToken(request);
             if (StringUtils.hasText(token)) {
                 var claims = jwtService.parseToken(token);
-                UUID userId = UUID.fromString(claims.getSubject());
-                String email = claims.get("email", String.class);
-                String role = claims.get("role", String.class);
-                List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                        new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
-                var auth = new UsernamePasswordAuthenticationToken(
-                        new AuthenticatedUser(userId, email, role),
-                        null,
-                        authorities);
-                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                if (!jwtService.isRefreshToken(claims)) {
+                    UUID userId = UUID.fromString(claims.getSubject());
+                    String email = claims.get("email", String.class);
+                    String role = claims.get("role", String.class);
+                    List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                            new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+                    var auth = new UsernamePasswordAuthenticationToken(
+                            new AuthenticatedUser(userId, email, role),
+                            null,
+                            authorities);
+                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                }
             }
         } catch (Exception ignored) {
             // Invalid token, proceed without auth

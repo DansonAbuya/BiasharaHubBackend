@@ -1,5 +1,6 @@
 package com.biasharahub.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -44,7 +45,25 @@ public class Product {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Column(name = "business_id")
+    private UUID businessId;
+
+    /** Moderation: pending_review, approved, rejected */
+    @Column(name = "moderation_status", length = 32)
+    @Builder.Default
+    private String moderationStatus = "approved";
+
+    @Column(name = "moderated_at")
+    private Instant moderatedAt;
+
+    @Column(name = "moderated_by_user_id")
+    private UUID moderatedByUserId;
+
+    @Column(name = "moderation_notes", columnDefinition = "TEXT")
+    private String moderationNotes;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     @Builder.Default
     private List<InventoryImage> images = new ArrayList<>();
 

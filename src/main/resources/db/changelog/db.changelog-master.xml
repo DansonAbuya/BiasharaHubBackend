@@ -9,5 +9,35 @@
     <include file="db/changelog/changes/002-create-tenant-schema-function.xml"/>
     <include file="db/changelog/changes/003-insert-default-tenant.xml"/>
     <include file="db/changelog/changes/004-seed-demo-users.xml"/>
+    <include file="db/changelog/changes/005-disable-2fa-default-users.xml"/>
+    <include file="db/changelog/changes/006-update-demo-password-to-password123.xml"/>
+    <include file="db/changelog/changes/007-add-password-reset-tokens.xml"/>
+    <include file="db/changelog/changes/008-add-user-business-fields.xml"/>
+    <include file="db/changelog/changes/009-add-product-business-id.xml"/>
+    <include file="db/changelog/changes/010-create-product-categories.xml"/>
+    <include file="db/changelog/changes/011-seed-product-categories.xml"/>
+    <include file="db/changelog/changes/012-create-tenant-wallet-ledger.xml"/>
+    <include file="db/changelog/changes/013-verification-moderation-trust.xml"/>
+    <include file="db/changelog/changes/014-seller-tiers.xml"/>
+    <include file="db/changelog/changes/015-add-applying-for-tier.xml"/>
+    <include file="db/changelog/changes/016-encryption-and-token-hash.xml"/>
+    <include file="db/changelog/changes/017-extend-shipments-schema.xml"/>
+    <include file="db/changelog/changes/018-extend-orders-shipping.xml"/>
+    <include file="db/changelog/changes/019-extend-payments-status.xml"/>
+    <include file="db/changelog/changes/020-add-users-phone.xml"/>
+    <include file="db/changelog/changes/021-add-pricing-and-branding.xml"/>
+    <include file="db/changelog/changes/022-create-notifications-table.xml"/>
+    <include file="db/changelog/changes/023-add-growth-plan-features.xml"/>
+    <include file="db/changelog/changes/024-add-payout-external-reference.xml"/>
+    <include file="db/changelog/changes/025-tenant-default-payout-destination.xml"/>
+    <include file="db/changelog/changes/026-trust-safety-users-strikes-checklist.xml"/>
+    <include file="db/changelog/changes/027-trust-safety-shipments-delivery-proof.xml"/>
+    <include file="db/changelog/changes/028-trust-safety-disputes.xml"/>
+    <include file="db/changelog/changes/029-courier-services-table.xml"/>
+    <include file="db/changelog/changes/030-courier-provider-integration.xml"/>
+    <include file="db/changelog/changes/031-add-assigned-courier-to-shipments.xml"/>
+    <include file="db/changelog/changes/032-update-create-tenant-schema-courier-support.xml"/>
+    <include file="db/changelog/changes/033-tenant-expenses-table.xml"/>
+    <include file="db/changelog/changes/034-add-expenses-to-create-tenant-schema.xml"/>
 
 </databaseChangeLog>

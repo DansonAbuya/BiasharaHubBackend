@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="012-create-tenant-wallet-ledger" author="Danson Abuya">
+        <!-- If table already exists (e.g. applied with previous author), mark this changeset as ran without executing -->
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="tenant_wallet_entries" schemaName="public"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="tenant_wallet_entries" schemaName="public">
+            <column name="entry_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_wallet_tenant"
+                             referencedTableName="tenants" referencedColumnNames="tenant_id"
+                             referencedTableSchemaName="public"/>
+            </column>
+            <column name="entry_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount" type="DECIMAL(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="commission_amount" type="DECIMAL(15,2)"/>
+            <column name="reference_id" type="VARCHAR(255)"/>
+            <column name="description" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <createIndex tableName="tenant_wallet_entries" indexName="idx_wallet_tenant_created"
+                     schemaName="public">
+            <column name="tenant_id"/>
+            <column name="created_at"/>
+        </createIndex>
+
+        <createTable tableName="tenant_payouts" schemaName="public">
+            <column name="payout_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_payout_tenant"
+                             referencedTableName="tenants" referencedColumnNames="tenant_id"
+                             referencedTableSchemaName="public"/>
+            </column>
+            <column name="method" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="amount" type="DECIMAL(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="destination_details" type="VARCHAR(1024)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="failure_reason" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="processed_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <createIndex tableName="tenant_payouts" indexName="idx_payout_tenant_created"
+                     schemaName="public">
+            <column name="tenant_id"/>
+            <column name="created_at"/>
+        </createIndex>
+
+    </changeSet>
+
+</databaseChangeLog>
+

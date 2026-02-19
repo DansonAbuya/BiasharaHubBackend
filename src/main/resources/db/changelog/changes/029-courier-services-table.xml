@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="029-courier-services-table" author="biasharahub">
+        <comment>Platform courier services catalog (public schema) for COURIER delivery mode</comment>
+        <sql>
+            CREATE TABLE IF NOT EXISTS public.courier_services (
+                courier_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name VARCHAR(255) NOT NULL,
+                code VARCHAR(64) NOT NULL UNIQUE,
+                description TEXT,
+                tracking_url_template VARCHAR(1024),
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                base_rate DECIMAL(15, 2) NOT NULL DEFAULT 0,
+                rate_per_kg DECIMAL(15, 2) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_courier_services_active ON public.courier_services(is_active);
+            CREATE INDEX IF NOT EXISTS idx_courier_services_code ON public.courier_services(code);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="032-update-create-tenant-schema-courier-support" author="Danson Abuya">
+        <comment>Update create_tenant_schema so new tenants get courier support (assistant_admin, courier roles; assigned_courier_id on shipments)</comment>
+        <sqlFile path="db/changelog/changes/032-update-create-tenant-schema-courier-support.sql" splitStatements="false"/>
+    </changeSet>
+</databaseChangeLog>

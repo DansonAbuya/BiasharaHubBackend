@@ -19,14 +19,14 @@ public class OpenApiConfig {
 
     @Bean
     public OpenAPI customOpenAPI() {
-        // Use resolved port so Swagger UI displays e.g. http://localhost:5050/api
+        // Use resolved port so Swagger UI displays correct API URL (local: 5050; UAT/prod: use backend URL)
         // instead of http://localhost:${SERVER_PORT:5050}/api
         String serverUrl = "http://localhost:" + serverPort + contextPath;
         return new OpenAPI()
                 .info(new io.swagger.v3.oas.models.info.Info()
                         .title("BiasharaHub API")
                         .version("1.0")
-                        .description("BiasharaHub - Multi-tenant SME Commerce Platform API"))
+                        .description("BiasharaHub - Multi-tenant SME Commerce Platform API. @ Sysnova Technologies."))
                 .servers(List.of(new Server().url(serverUrl).description("Local server")));
     }
 }

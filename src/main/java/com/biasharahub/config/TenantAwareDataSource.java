@@ -32,7 +32,7 @@ public class TenantAwareDataSource extends AbstractDataSource {
     private void setSchema(Connection connection) throws SQLException {
         String schema = TenantContext.getTenantSchema();
         if (schema == null) {
-            schema = "public";
+            schema = "tenant_default";
         }
 
         if (!schema.matches("^[a-zA-Z0-9_]+$")) {
