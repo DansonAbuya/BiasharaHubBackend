@@ -1,11 +1,14 @@
 package com.biasharahub.controller;
 
+import com.biasharahub.dto.request.ConfirmCashPaymentRequest;
 import com.biasharahub.dto.request.PaymentInitiateRequest;
 import com.biasharahub.dto.response.PaymentInitiateResponse;
 import com.biasharahub.entity.Order;
 import com.biasharahub.entity.Payment;
+import com.biasharahub.entity.Shipment;
 import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.PaymentRepository;
+import com.biasharahub.repository.ShipmentRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.*;
@@ -28,6 +31,7 @@ public class PaymentController {
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final ShipmentRepository shipmentRepository;
     private final UserRepository userRepository;
     private final OrderEventPublisher orderEventPublisher;
     private final MpesaClient mpesaClient;
@@ -109,7 +113,8 @@ public class PaymentController {
     public ResponseEntity<?> confirmPayment(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable UUID orderId,
-            @PathVariable UUID paymentId) {
+            @PathVariable UUID paymentId,
+            @RequestBody(required = false) ConfirmCashPaymentRequest body) {
         if (user == null) return ResponseEntity.status(401).build();
         String role = user.role() != null ? user.role().toLowerCase() : "";
         boolean canConfirm = "owner".equals(role) || "staff".equals(role)
@@ -126,7 +131,33 @@ public class PaymentController {
                     Order order = payment.getOrder();
                     if (order != null && "pending".equalsIgnoreCase(order.getOrderStatus())) {
                         order.setOrderStatus("confirmed");
+                        // Apply delivery details from body (seller confirms delivery before shipment is created)
+                        if (body != null) {
+                            if (body.getDeliveryMode() != null && !body.getDeliveryMode().isBlank()) {
+                                order.setDeliveryMode(body.getDeliveryMode().trim());
+                            }
+                            if (body.getShippingAddress() != null) {
+                                order.setShippingAddress(body.getShippingAddress().trim().isEmpty() ? null : body.getShippingAddress().trim());
+                            }
+                        }
                         orderRepository.save(order);
+                        // Create shipment immediately for cash-confirmed orders (so it always exists)
+                        java.util.List<Shipment> existing = shipmentRepository.findByOrder(order);
+                        if (existing.isEmpty()) {
+                            String deliveryMode = order.getDeliveryMode() != null ? order.getDeliveryMode() : "SELLER_SELF";
+                            String pickupLocation = (body != null && body.getPickupLocation() != null && !body.getPickupLocation().isBlank())
+                                    ? body.getPickupLocation().trim() : null;
+                            Shipment.ShipmentBuilder builder = Shipment.builder()
+                                    .order(order)
+                                    .deliveryMode(deliveryMode)
+                                    .status("CREATED")
+                                    .pickupLocation(pickupLocation);
+                            if ("SELLER_SELF".equalsIgnoreCase(deliveryMode) || "CUSTOMER_PICKUP".equalsIgnoreCase(deliveryMode)) {
+                                int code = (int) (Math.random() * 1_000_000);
+                                builder.otpCode(String.format("%06d", code));
+                            }
+                            shipmentRepository.save(builder.build());
+                        }
                     }
                     tenantWalletService.recordIncomingPaymentForCurrentTenant(
                             payment.getAmount(), orderId.toString(), paymentId.toString());
