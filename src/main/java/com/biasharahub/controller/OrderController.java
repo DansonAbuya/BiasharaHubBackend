@@ -1,12 +1,20 @@
 package com.biasharahub.controller;
 
 import com.biasharahub.dto.request.CreateOrderRequest;
+import com.biasharahub.dto.request.UpdateOrderDeliveryRequest;
 import com.biasharahub.dto.response.OrderDto;
 import com.biasharahub.dto.response.OrderItemDto;
-import com.biasharahub.entity.*;
+import com.biasharahub.entity.Order;
+import com.biasharahub.entity.OrderItem;
+import com.biasharahub.entity.Payment;
+import com.biasharahub.entity.Product;
+import com.biasharahub.entity.User;
+import com.biasharahub.entity.InventoryImage;
+import com.biasharahub.entity.Shipment;
 import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.PaymentRepository;
 import com.biasharahub.repository.ProductRepository;
+import com.biasharahub.repository.ShipmentRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.InAppNotificationService;
@@ -41,6 +49,7 @@ public class OrderController {
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final PaymentRepository paymentRepository;
+    private final ShipmentRepository shipmentRepository;
     private final OrderEventPublisher orderEventPublisher;
     private final InAppNotificationService inAppNotificationService;
     private final WhatsAppNotificationService whatsAppNotificationService;
@@ -184,6 +193,66 @@ public class OrderController {
         orderEventPublisher.orderCreated(order);
 
         return ResponseEntity.ok(toDto(order));
+    }
+
+    /**
+     * Seller sets or updates delivery mode and address for an order.
+     * Used for cash orders where the seller decides how and where to ship/deliver.
+     * Staff/owner only. Updates order and existing shipment if any.
+     */
+    @PatchMapping("/{id}/delivery")
+    @Transactional
+    public ResponseEntity<?> updateOrderDelivery(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id,
+            @RequestBody UpdateOrderDeliveryRequest request) {
+        if (user == null) return ResponseEntity.status(401).build();
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        boolean canUpdate = "owner".equals(role) || "staff".equals(role)
+                || "super_admin".equals(role) || "assistant_admin".equals(role);
+        if (!canUpdate) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    java.util.Map.of("error", "Only staff or owners can set delivery for orders."));
+        }
+        return orderRepository.findById(id)
+                .map(order -> {
+                    if (request.getDeliveryMode() != null && !request.getDeliveryMode().isBlank()) {
+                        order.setDeliveryMode(request.getDeliveryMode().trim());
+                    }
+                    if (request.getShippingAddress() != null) {
+                        order.setShippingAddress(request.getShippingAddress().trim().isEmpty() ? null : request.getShippingAddress().trim());
+                    }
+                    if (request.getShippingFee() != null) {
+                        order.setShippingFee(request.getShippingFee());
+                    }
+                    orderRepository.save(order);
+
+                    List<Shipment> shipments = shipmentRepository.findByOrder(order);
+                    String mode = request.getDeliveryMode() != null && !request.getDeliveryMode().isBlank()
+                            ? request.getDeliveryMode().trim() : order.getDeliveryMode();
+                    String pickup = request.getPickupLocation() != null && !request.getPickupLocation().isBlank()
+                            ? request.getPickupLocation().trim() : null;
+                    if (!shipments.isEmpty()) {
+                        Shipment first = shipments.get(0);
+                        if (mode != null) first.setDeliveryMode(mode);
+                        first.setPickupLocation(pickup);
+                        shipmentRepository.save(first);
+                    } else if ("confirmed".equalsIgnoreCase(order.getOrderStatus())) {
+                        // Create shipment so seller's delivery choice (and pickup location) is persisted
+                        Shipment.ShipmentBuilder builder = Shipment.builder()
+                                .order(order)
+                                .deliveryMode(mode != null ? mode : "SELLER_SELF")
+                                .status("CREATED")
+                                .pickupLocation(pickup);
+                        if ("SELLER_SELF".equalsIgnoreCase(mode) || "CUSTOMER_PICKUP".equalsIgnoreCase(mode)) {
+                            int code = (int) (Math.random() * 1_000_000);
+                            builder.otpCode(String.format("%06d", code));
+                        }
+                        shipmentRepository.save(builder.build());
+                    }
+                    return ResponseEntity.ok(toDto(order));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PatchMapping("/{id}/status")
