@@ -123,6 +123,11 @@ public class PaymentController {
                 .map(payment -> {
                     payment.setPaymentStatus("completed");
                     paymentRepository.save(payment);
+                    Order order = payment.getOrder();
+                    if (order != null && "pending".equalsIgnoreCase(order.getOrderStatus())) {
+                        order.setOrderStatus("confirmed");
+                        orderRepository.save(order);
+                    }
                     tenantWalletService.recordIncomingPaymentForCurrentTenant(
                             payment.getAmount(), orderId.toString(), paymentId.toString());
                     orderEventPublisher.paymentCompleted(orderId, paymentId);
