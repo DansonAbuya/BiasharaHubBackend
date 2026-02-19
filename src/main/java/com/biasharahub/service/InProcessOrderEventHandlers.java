@@ -118,6 +118,25 @@ public class InProcessOrderEventHandlers {
             } catch (Exception e) {
                 log.warn("Failed to create in-app payment-completed notification for order {}: {}", orderId, e.getMessage());
             }
+
+            // Notify seller (owner + staff): in-app, WhatsApp, SMS – order must have items loaded
+            orderRepository.findByIdWithItems(orderId).ifPresent(order -> {
+                try {
+                    inAppNotificationService.notifySellerPaymentCompleted(order);
+                } catch (Exception e) {
+                    log.warn("Failed to create in-app seller payment-completed notification for {}: {}", orderId, e.getMessage());
+                }
+                try {
+                    whatsAppNotificationService.notifySellerPaymentCompleted(order);
+                } catch (Exception e) {
+                    log.warn("Failed to send WhatsApp seller payment-completed notification for {}: {}", orderId, e.getMessage());
+                }
+                try {
+                    smsNotificationService.notifySellerPaymentCompleted(order);
+                } catch (Exception e) {
+                    log.warn("Failed to send SMS seller payment-completed notification for {}: {}", orderId, e.getMessage());
+                }
+            });
         } catch (Exception e) {
             log.warn("In-process payment.completed handler failed for order {}: {}", orderId, e.getMessage());
         }
