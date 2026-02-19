@@ -7,6 +7,9 @@ import com.biasharahub.entity.Order;
 import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.DisputeService;
+import com.biasharahub.service.InAppNotificationService;
+import com.biasharahub.service.SmsNotificationService;
+import com.biasharahub.service.WhatsAppNotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -30,6 +33,9 @@ public class DisputeController {
 
     private final DisputeService disputeService;
     private final OrderRepository orderRepository;
+    private final InAppNotificationService inAppNotificationService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
+    private final SmsNotificationService smsNotificationService;
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -47,6 +53,12 @@ public class DisputeController {
                     request.getDisputeType(),
                     request.getDescription(),
                     request.getDeliveryProofUrl());
+            // Notify seller (owner + staff): in-app, WhatsApp, SMS – order must have items loaded
+            orderRepository.findByIdWithItems(request.getOrderId()).ifPresent(loadedOrder -> {
+                try { inAppNotificationService.notifySellerDisputeCreated(loadedOrder, request.getDisputeType()); } catch (Exception ignored) {}
+                try { whatsAppNotificationService.notifySellerDisputeCreated(loadedOrder, request.getDisputeType()); } catch (Exception ignored) {}
+                try { smsNotificationService.notifySellerDisputeCreated(loadedOrder, request.getDisputeType()); } catch (Exception ignored) {}
+            });
             return ResponseEntity.status(HttpStatus.CREATED).body(disputeService.toDto(dispute));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

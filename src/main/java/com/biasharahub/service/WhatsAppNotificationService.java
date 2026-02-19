@@ -3,6 +3,7 @@ package com.biasharahub.service;
 import com.biasharahub.entity.Order;
 import com.biasharahub.entity.OrderItem;
 import com.biasharahub.entity.Payment;
+import com.biasharahub.entity.Product;
 import com.biasharahub.entity.Shipment;
 import com.biasharahub.entity.User;
 import com.biasharahub.repository.OrderRepository;
@@ -98,6 +99,64 @@ public class WhatsAppNotificationService {
                             order.getOrderNumber());
                     client.sendMessage(phone, body);
                 }));
+    }
+
+    /** Notify seller (owner + staff) via WhatsApp when an order is paid. */
+    public void notifySellerPaymentCompleted(Order order) {
+        UUID businessId = getBusinessIdFromOrder(order);
+        if (businessId == null) return;
+        String body = String.format(
+                "BiasharaHub: Order #%s has been paid. You can now prepare and dispatch.",
+                order.getOrderNumber());
+        for (User u : getSellerUsers(businessId)) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) {
+                client.sendMessage(u.getPhone(), body);
+            }
+        }
+    }
+
+    /** Notify seller when product stock is running low. */
+    public void notifySellerLowStock(Product product) {
+        if (product == null || product.getBusinessId() == null) return;
+        int qty = product.getQuantity() != null ? product.getQuantity() : 0;
+        String body = String.format(
+                "BiasharaHub: Low stock – \"%s\" has %d left. Consider restocking.",
+                product.getName() != null ? product.getName() : "Unknown",
+                qty);
+        for (User u : getSellerUsers(product.getBusinessId())) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) {
+                client.sendMessage(u.getPhone(), body);
+            }
+        }
+    }
+
+    /** Notify seller when a customer opens a dispute. */
+    public void notifySellerDisputeCreated(Order order, String disputeType) {
+        UUID businessId = getBusinessIdFromOrder(order);
+        if (businessId == null) return;
+        String body = String.format(
+                "BiasharaHub: A customer opened a dispute for order #%s%s. Please respond in the dashboard.",
+                order.getOrderNumber(),
+                disputeType != null && !disputeType.isBlank() ? " (" + disputeType + ")" : "");
+        for (User u : getSellerUsers(businessId)) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) {
+                client.sendMessage(u.getPhone(), body);
+            }
+        }
+    }
+
+    /** Notify seller when an order is cancelled. */
+    public void notifySellerOrderCancelled(Order order) {
+        UUID businessId = getBusinessIdFromOrder(order);
+        if (businessId == null) return;
+        String body = String.format(
+                "BiasharaHub: Order #%s was cancelled. Inventory has been restored.",
+                order.getOrderNumber());
+        for (User u : getSellerUsers(businessId)) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) {
+                client.sendMessage(u.getPhone(), body);
+            }
+        }
     }
 
     public void notifyShipmentUpdated(Shipment shipment) {

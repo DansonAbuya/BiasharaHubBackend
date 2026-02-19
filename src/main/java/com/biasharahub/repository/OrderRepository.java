@@ -41,4 +41,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     /** Customer phone for WhatsApp; used without loading full Order/User. */
     @Query("SELECT u.phone FROM Order o JOIN o.user u WHERE o.orderId = :orderId")
     Optional<String> findCustomerPhoneByOrderId(@Param("orderId") UUID orderId);
+
+    /** Load order with items and product per item (for seller notifications). */
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.items i LEFT JOIN FETCH i.product WHERE o.orderId = :id")
+    Optional<Order> findByIdWithItems(@Param("id") UUID id);
 }

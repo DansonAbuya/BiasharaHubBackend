@@ -9,7 +9,10 @@ import com.biasharahub.repository.PaymentRepository;
 import com.biasharahub.repository.ProductRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
+import com.biasharahub.service.InAppNotificationService;
 import com.biasharahub.service.OrderEventPublisher;
+import com.biasharahub.service.SmsNotificationService;
+import com.biasharahub.service.WhatsAppNotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,7 +23,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,11 +34,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderController {
 
+    /** Low-stock threshold for seller alerts when stock drops after order. */
+    private static final int LOW_STOCK_THRESHOLD = 10;
+
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final PaymentRepository paymentRepository;
     private final OrderEventPublisher orderEventPublisher;
+    private final InAppNotificationService inAppNotificationService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
+    private final SmsNotificationService smsNotificationService;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -148,6 +159,17 @@ public class OrderController {
         order.setTotalAmount(total);
         order = orderRepository.save(order);
 
+        // Notify seller when any product is now low stock (in-app, WhatsApp, SMS) – once per product
+        Set<UUID> lowStockNotified = new HashSet<>();
+        for (OrderItem oi : order.getItems()) {
+            Product p = oi.getProduct();
+            if (p != null && p.getQuantity() != null && p.getQuantity() <= LOW_STOCK_THRESHOLD && lowStockNotified.add(p.getProductId())) {
+                try { inAppNotificationService.notifySellerLowStock(p); } catch (Exception ignored) {}
+                try { whatsAppNotificationService.notifySellerLowStock(p); } catch (Exception ignored) {}
+                try { smsNotificationService.notifySellerLowStock(p); } catch (Exception ignored) {}
+            }
+        }
+
         String paymentMethod = request.getPaymentMethod() != null && "cash".equalsIgnoreCase(request.getPaymentMethod().trim())
                 ? "Cash" : "M-Pesa";
         Payment payment = Payment.builder()
@@ -228,6 +250,10 @@ public class OrderController {
 
                     o.setOrderStatus("cancelled");
                     orderRepository.save(o);
+                    // Notify seller (owner + staff): in-app, WhatsApp, SMS
+                    try { inAppNotificationService.notifySellerOrderCancelled(o); } catch (Exception ignored) {}
+                    try { whatsAppNotificationService.notifySellerOrderCancelled(o); } catch (Exception ignored) {}
+                    try { smsNotificationService.notifySellerOrderCancelled(o); } catch (Exception ignored) {}
                     return ResponseEntity.ok(toDto(o));
                 })
                 .orElse(ResponseEntity.status(404).<OrderDto>build());
