@@ -14,6 +14,9 @@ public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
 
     List<Shipment> findByOrder(Order order);
 
+    /** Find by order id (avoids proxy/context issues when creating shipment after confirm). */
+    List<Shipment> findByOrder_OrderId(UUID orderId);
+
     Optional<Shipment> findByTrackingNumber(String trackingNumber);
 
     @Query("SELECT o.orderId FROM Shipment s JOIN s.order o WHERE s.shipmentId = :shipmentId")

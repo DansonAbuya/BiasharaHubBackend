@@ -141,23 +141,25 @@ public class PaymentController {
                             }
                         }
                         orderRepository.save(order);
-                        // Create shipment immediately for cash-confirmed orders (so it always exists)
-                        java.util.List<Shipment> existing = shipmentRepository.findByOrder(order);
-                        if (existing.isEmpty()) {
-                            String deliveryMode = order.getDeliveryMode() != null ? order.getDeliveryMode() : "SELLER_SELF";
-                            String pickupLocation = (body != null && body.getPickupLocation() != null && !body.getPickupLocation().isBlank())
-                                    ? body.getPickupLocation().trim() : null;
-                            Shipment.ShipmentBuilder builder = Shipment.builder()
-                                    .order(order)
-                                    .deliveryMode(deliveryMode)
-                                    .status("CREATED")
-                                    .pickupLocation(pickupLocation);
-                            if ("SELLER_SELF".equalsIgnoreCase(deliveryMode) || "CUSTOMER_PICKUP".equalsIgnoreCase(deliveryMode)) {
-                                int code = (int) (Math.random() * 1_000_000);
-                                builder.otpCode(String.format("%06d", code));
-                            }
-                            shipmentRepository.save(builder.build());
+                    }
+                    orderRepository.flush();
+                    // Always ensure a shipment exists for this order after cash confirm (same request, so no race with async)
+                    java.util.List<Shipment> existing = shipmentRepository.findByOrder_OrderId(orderId);
+                    if (existing.isEmpty() && order != null) {
+                        Order managedOrder = orderRepository.findById(orderId).orElseThrow();
+                        String deliveryMode = managedOrder.getDeliveryMode() != null ? managedOrder.getDeliveryMode() : "SELLER_SELF";
+                        String pickupLocation = (body != null && body.getPickupLocation() != null && !body.getPickupLocation().isBlank())
+                                ? body.getPickupLocation().trim() : null;
+                        Shipment.ShipmentBuilder builder = Shipment.builder()
+                                .order(managedOrder)
+                                .deliveryMode(deliveryMode)
+                                .status("CREATED")
+                                .pickupLocation(pickupLocation);
+                        if ("SELLER_SELF".equalsIgnoreCase(deliveryMode) || "CUSTOMER_PICKUP".equalsIgnoreCase(deliveryMode)) {
+                            int code = (int) (Math.random() * 1_000_000);
+                            builder.otpCode(String.format("%06d", code));
                         }
+                        shipmentRepository.saveAndFlush(builder.build());
                     }
                     tenantWalletService.recordIncomingPaymentForCurrentTenant(
                             payment.getAmount(), orderId.toString(), paymentId.toString());
