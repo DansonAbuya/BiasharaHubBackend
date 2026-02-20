@@ -23,13 +23,12 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * WhatsApp Business AI Chatbot: 24/7 assistant per the flow diagram.
- * - Shops: list shops (stores), search by shop name or number.
- * - Inventory check: "Is it in stock?" / "STOCK" / "STOCK &lt;shop&gt;" → Checks product stock (by shop when given).
- * - Order: "Order Confirmed!" / creates order or lists orders.
- * - Payment: "Please Pay Now." → Sends M-Pesa payment request.
- * - Shipment: "Delivery Method Set." / status updates.
- * - Customer updates: Order Shipped, Out for Delivery, Delivered! (sent by WhatsAppNotificationService).
+ * WhatsApp Business AI Chatbot: 24/7 assistant for products and services.
+ * - Products: list shops, STOCK / STOCK &lt;shop&gt;, ORDER, PAY, DELIVERY status.
+ * - Services: list verified service providers (expertise, skills, talents); LOCATION &lt;number&gt; for address/map;
+ *   BOOK &lt;number&gt; with optional date/time and location (share location or "BOOK 1 at &lt;address&gt;");
+ *   BOOKINGS, PAY SERVICE for M-Pesa. Online services: video/phone/WhatsApp/email etc. per service.
+ * - Customer updates: Order Shipped, Out for Delivery, Delivered (WhatsAppNotificationService).
  */
 @Service
 @RequiredArgsConstructor
@@ -169,19 +168,15 @@ public class WhatsAppChatbotService {
         if (stage == ChatStage.SERVICE_LIST) {
             List<UUID> serviceIds = lastServiceIdsByPhone.get(phone);
             if (serviceIds != null && !serviceIds.isEmpty()) {
-                return "📍 Location received! Your location will be used for your next booking.\n\n"
-                        + "Reply BOOK <number> to book a service at this location (e.g. BOOK 1).\n"
-                        + "Or add a description: BOOK 1 at " + String.format("%.4f, %.4f", lat, lng);
+                return "📍 Location received! We'll use it for your in-person booking.\n\n"
+                        + "Reply BOOK <number> to confirm (e.g. BOOK 1).\n"
+                        + "Reply SERVICES to pick another provider, MENU for main menu.";
             }
         }
 
-        return "📍 Location received! Your location has been saved for your next physical service booking.\n\n"
-                + "To book a service:\n"
-                + "1. Reply SERVICES to browse service providers\n"
-                + "2. Pick a provider to see their services\n"
-                + "3. Reply BOOK <number> to book\n\n"
-                + "Your shared location will automatically be used for physical services.\n"
-                + "Reply MENU for main menu.";
+        return "📍 Location saved for your next in-person service booking.\n\n"
+                + "Next: Reply SERVICES → pick a provider → see their services → BOOK <number>.\n"
+                + "Your location will be sent to the provider. Reply MENU for main menu.";
     }
 
     private String normalizePhoneFromTwilio(String from) {
@@ -418,8 +413,9 @@ public class WhatsAppChatbotService {
 
         // ===== SERVICE PROVIDER COMMANDS =====
 
-        // List service providers: "SERVICES", "PROVIDERS", "SERVICE PROVIDERS"
-        if (lower.equals("services") || lower.equals("providers") || lower.equals("service providers") || lower.contains("browse services")) {
+        // List service providers: "SERVICES", "PROVIDERS", "SERVICE PROVIDERS", "CATEGORIES" (we show providers, then their services)
+        if (lower.equals("services") || lower.equals("providers") || lower.equals("service providers") || lower.contains("browse services")
+                || lower.equals("categories") || lower.equals("service categories")) {
             stageByPhone.put(phone, ChatStage.SERVICE_PROVIDER_LIST);
             return replyServiceProviders(phone);
         }
@@ -544,21 +540,23 @@ public class WhatsAppChatbotService {
     private String buildMenu(User customer) {
         StringBuilder sb = new StringBuilder();
         sb.append("BiasharaHub 24/7 Assistant\n\n");
-        sb.append("*PRODUCTS*\n");
-        sb.append("1. Product shops – reply SHOPS to browse shops\n");
+        sb.append("*PRODUCTS (shops)*\n");
+        sb.append("1. Browse shops – reply SHOPS\n");
         sb.append("2. Check stock – reply STOCK or STOCK <shop>\n");
         sb.append("3. My orders – reply ORDER\n");
         sb.append("4. Pay for order – reply PAY\n");
         sb.append("5. Delivery status – reply DELIVERY\n\n");
-        sb.append("*SERVICES*\n");
+        sb.append("*SERVICES (expertise, skills, talents)*\n");
         sb.append("6. Service providers – reply SERVICES\n");
-        sb.append("   📍 View provider locations with LOCATION <number>\n");
+        sb.append("   • Verified professionals (online or in-person)\n");
+        sb.append("   • Reply LOCATION <number> to see provider address/map before booking\n");
+        sb.append("   • For in-person: share your location or type BOOK 1 at <your address>\n");
         sb.append("7. My bookings – reply BOOKINGS\n");
         sb.append("8. Pay for booking – reply PAY SERVICE\n\n");
         if (customer == null) {
-            sb.append("Register at ").append(storefrontUrl).append(" with your phone to order products or book services.");
+            sb.append("Register at ").append(storefrontUrl).append(" to order products or book services.");
         } else {
-            sb.append("Visit ").append(storefrontUrl).append(" to browse and order. Reply MENU at any time.");
+            sb.append("Browse: ").append(storefrontUrl).append(" (shops & services). Reply MENU anytime.");
         }
         return sb.toString();
     }
@@ -896,12 +894,12 @@ public class WhatsAppChatbotService {
         List<User> providers = userRepository
                 .findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
         if (providers.isEmpty()) {
-            return "No service providers available at the moment. Visit " + storefrontUrl + "/services to check back later, or reply SHOPS to browse product shops.";
+            return "No verified service providers at the moment. Visit " + storefrontUrl + "/services to check back later.\n\nReply SHOPS to browse product shops, or MENU for main menu.";
         }
         int limit = Math.min(providers.size(), MAX_SERVICE_PROVIDERS_IN_REPLY);
         List<UUID> ids = new ArrayList<>(limit);
         StringBuilder sb = new StringBuilder();
-        sb.append("Service Providers on BiasharaHub:\n\n");
+        sb.append("Verified service providers (expertise, skills, talents):\n\n");
         for (int i = 0; i < limit; i++) {
             User p = providers.get(i);
             ids.add(p.getUserId());
@@ -914,7 +912,6 @@ public class WhatsAppChatbotService {
             // Show location for physical/both delivery types
             if (("PHYSICAL".equalsIgnoreCase(deliveryType) || "BOTH".equalsIgnoreCase(deliveryType))) {
                 if (p.getServiceLocationDescription() != null && !p.getServiceLocationDescription().isBlank()) {
-                    // Truncate long descriptions
                     String locDesc = p.getServiceLocationDescription();
                     if (locDesc.length() > 40) locDesc = locDesc.substring(0, 37) + "...";
                     sb.append("\n   📍 ").append(locDesc);
@@ -929,9 +926,10 @@ public class WhatsAppChatbotService {
             sb.append("\n... and ").append(providers.size() - limit).append(" more.");
         }
         sb.append("\n━━━━━━━━━━━━━━━━━━━━━━\n");
-        sb.append("• Reply 1, 2, 3... to see services\n");
-        sb.append("• Reply LOCATION <number> for provider location (e.g. LOCATION 1)\n");
-        sb.append("• Visit ").append(storefrontUrl).append("/services for map search");
+        sb.append("• Reply 1, 2, 3... to see their services and book\n");
+        sb.append("• Reply LOCATION <number> to see address & map (e.g. LOCATION 1)\n");
+        sb.append("• Online = video/phone/WhatsApp/email – see each service for details\n");
+        sb.append("• Browse on web: ").append(storefrontUrl).append("/services");
         return sb.toString();
     }
 
@@ -997,16 +995,8 @@ public class WhatsAppChatbotService {
 
         if ("ONLINE".equalsIgnoreCase(deliveryType)) {
             sb.append("🌐 This provider offers *online/remote services only*.\n\n");
-            sb.append("*Services can be delivered via:*\n");
-            sb.append("📹 Video Call (Zoom, Google Meet, etc.)\n");
-            sb.append("📞 Phone Call\n");
-            sb.append("💬 WhatsApp chat/call\n");
-            sb.append("📧 Email consultations\n");
-            sb.append("🖥️ Screen sharing sessions\n");
-            sb.append("📁 Digital file delivery\n");
-            sb.append("🎬 Recorded content/tutorials\n\n");
-            sb.append("Each service specifies its delivery method.\n");
-            sb.append("Reply SERVICE ").append(providerArg).append(" to see their services and book.");
+            sb.append("*Delivery may include:* Video call, phone call, WhatsApp, live chat, email, screen share, file delivery, recorded content.\n\n");
+            sb.append("Each service shows how it's delivered. Reply SERVICE ").append(providerArg).append(" to see services and book.");
             return sb.toString();
         }
 
@@ -1125,20 +1115,21 @@ public class WhatsAppChatbotService {
             sb.append("📞 Contact: ").append(provider.getPhone()).append("\n\n");
         }
 
-        sb.append("*Available Services:*\n\n");
+        sb.append("*Available services:*\n\n");
         for (int i = 0; i < limit; i++) {
             ServiceOffering s = services.get(i);
             ids.add(s.getServiceId());
             String deliveryType = s.getDeliveryType();
             String typeLabel = "PHYSICAL".equalsIgnoreCase(deliveryType) ? "📍 In-person" : "🌐 Online";
-            String duration = s.getDurationMinutes() != null ? " (~" + s.getDurationMinutes() + "min)" : "";
-            sb.append(i + 1).append(". ").append(s.getName()).append("\n");
+            String duration = s.getDurationMinutes() != null ? " (~" + s.getDurationMinutes() + " min)" : "";
+            String categoryLine = (s.getCategory() != null && !s.getCategory().isBlank()) ? " [" + s.getCategory() + "]" : "";
+            sb.append(i + 1).append(". ").append(s.getName()).append(categoryLine).append("\n");
             sb.append("   💰 KES ").append(s.getPrice()).append(" | ").append(typeLabel).append(duration).append("\n");
             if (s.getDescription() != null && !s.getDescription().isBlank()) {
                 String desc = s.getDescription().length() > 55 ? s.getDescription().substring(0, 52) + "..." : s.getDescription();
                 sb.append("   ").append(desc).append("\n");
             }
-            // Show online delivery methods for virtual services
+            // Show online delivery methods for virtual/online services
             if ("VIRTUAL".equalsIgnoreCase(deliveryType) && s.getOnlineDeliveryMethods() != null && !s.getOnlineDeliveryMethods().isBlank()) {
                 sb.append("   ✨ Via: ").append(formatOnlineDeliveryMethods(s.getOnlineDeliveryMethods())).append("\n");
             }
@@ -1150,12 +1141,12 @@ public class WhatsAppChatbotService {
 
         sb.append("\n━━━━━━━━━━━━━━━━━━━━━━\n");
         sb.append("📝 *To book:*\n");
-        sb.append("• Reply BOOK <number> (e.g. BOOK 1)\n");
+        sb.append("• BOOK <number> (e.g. BOOK 1)\n");
         sb.append("• With date: BOOK 1 2026-02-25\n");
         if (hasPhysicalServices) {
-            sb.append("• For in-person: Share your location or type BOOK 1 at <your address>\n");
+            sb.append("• In-person: share your location (📎) or type BOOK 1 at <your address>\n");
         }
-        sb.append("\nReply SERVICES for other providers.");
+        sb.append("\nReply SERVICES for other providers, LOCATION for this provider's address.");
         return sb.toString();
     }
 
@@ -1171,12 +1162,12 @@ public class WhatsAppChatbotService {
                                                 Double locationLat, Double locationLng, String locationDescription) {
         List<UUID> serviceIds = lastServiceIdsByPhone.get(phone);
         if (serviceIds == null || listNum < 1 || listNum > serviceIds.size()) {
-            return "View a service list first: reply SERVICES to browse providers, pick one, then reply BOOK <number> (e.g. BOOK 1). Or reply MENU for main menu.";
+            return "Reply SERVICES to see providers → pick one → then BOOK <number> (e.g. BOOK 1). Reply MENU for main menu.";
         }
         UUID serviceId = serviceIds.get(listNum - 1);
         ServiceOffering service = serviceOfferingRepository.findByServiceIdWithCategory(serviceId).orElse(null);
         if (service == null || service.getIsActive() == null || !service.getIsActive()) {
-            return "Service not available. Reply SERVICES to browse other services.";
+            return "That service isn't available. Reply SERVICES to browse and pick another.";
         }
 
         LocalDate requestedDate;
@@ -1225,13 +1216,11 @@ public class WhatsAppChatbotService {
 
         // For physical services, prompt for location if not provided
         if (isPhysical && finalLat == null && finalLng == null && (finalLocationDesc == null || finalLocationDesc.isBlank())) {
-            return "📍 This is an in-person service. Please provide your location:\n\n"
-                    + "Option 1: Share your location using WhatsApp's location feature (📎 → Location)\n\n"
-                    + "Option 2: Type your address:\n"
-                    + "BOOK " + listNum + " at <your address>\n"
-                    + "(e.g. BOOK " + listNum + " at Westlands Mall, Nairobi)\n\n"
-                    + "Option 3: Book with date and location:\n"
-                    + "BOOK " + listNum + " 2026-02-25 at <your address>";
+            return "📍 In-person service – we need your location:\n\n"
+                    + "• Share location: tap 📎 → Location → Send\n"
+                    + "• Or type: BOOK " + listNum + " at <your address>\n"
+                    + "  (e.g. BOOK " + listNum + " at Westlands Mall, Nairobi)\n\n"
+                    + "Reply with your location or address to continue.";
         }
 
         try {
@@ -1297,7 +1286,7 @@ public class WhatsAppChatbotService {
     private String replyMyBookings(User customer, String phone) {
         List<ServiceAppointment> bookings = serviceAppointmentRepository.findByUserIdOrderByRequestedDateDesc(customer.getUserId());
         if (bookings.isEmpty()) {
-            return "You have no service bookings yet. Reply SERVICES to browse service providers, or ORDER to see your product orders.";
+            return "You have no service bookings yet. Reply SERVICES to browse verified providers and book, or ORDER to see your product orders.";
         }
         int limit = Math.min(bookings.size(), MAX_BOOKINGS_IN_REPLY);
         List<UUID> ids = new ArrayList<>(limit);
@@ -1312,7 +1301,6 @@ public class WhatsAppChatbotService {
             String status = a.getStatus() != null ? a.getStatus() : "PENDING";
             BigDecimal price = a.getService() != null ? a.getService().getPrice() : BigDecimal.ZERO;
 
-            // Check payment status
             boolean unpaid = serviceBookingPaymentRepository.findByAppointmentAndPaymentStatus(a, "pending").isPresent();
 
             sb.append(i + 1).append(". ").append(serviceName).append(" – ").append(dateStr).append(timeStr).append("\n");
@@ -1325,7 +1313,7 @@ public class WhatsAppChatbotService {
             sb.append("\n... and ").append(bookings.size() - limit).append(" more.");
         }
         sb.append("\n\nReply PAY SERVICE <number> to pay (e.g. PAY SERVICE 1).\n");
-        sb.append("Reply SERVICES to browse more, MENU for main menu.");
+        sb.append("Reply SERVICES to book more, MENU for main menu.");
         return sb.toString();
     }
 
@@ -1338,7 +1326,7 @@ public class WhatsAppChatbotService {
                 .collect(Collectors.toList());
 
         if (unpaidBookings.isEmpty()) {
-            return "You have no unpaid service bookings. Reply BOOKINGS to see all bookings, or SERVICES to browse and book services.";
+            return "You have no unpaid service bookings. Reply BOOKINGS to see all, or SERVICES to browse and book.";
         }
         int limit = Math.min(unpaidBookings.size(), MAX_BOOKINGS_IN_REPLY);
         List<UUID> ids = new ArrayList<>(limit);
@@ -1355,8 +1343,8 @@ public class WhatsAppChatbotService {
         if (unpaidBookings.size() > limit) {
             sb.append("\n... and ").append(unpaidBookings.size() - limit).append(" more.");
         }
-        sb.append("\n\nReply PAY SERVICE <number> to pay (e.g. PAY SERVICE 1).\n");
-        sb.append("Reply BOOKINGS for all bookings, MENU for main menu.");
+        sb.append("\n\nReply PAY SERVICE <number> (e.g. PAY SERVICE 1) to pay with M-Pesa.\n");
+        sb.append("Reply BOOKINGS for all, MENU for main menu.");
         return sb.toString();
     }
 
