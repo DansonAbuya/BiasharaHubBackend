@@ -42,6 +42,7 @@ public class ServiceProviderVerificationService {
     private final UserRepository userRepository;
     private final ServiceCategoryRepository serviceCategoryRepository;
     private final ServiceProviderDocumentRepository documentRepository;
+    private final MailService mailService;
 
     /** Owner applies to become a service provider. Resets status to pending and stores category, delivery type, and docs. */
     @Transactional
@@ -177,6 +178,14 @@ public class ServiceProviderVerificationService {
         owner.setServiceProviderVerifiedByUserId(admin.userId());
         owner.setServiceProviderNotes(notes);
         owner = userRepository.save(owner);
+
+        // Send email notification
+        if (STATUS_VERIFIED.equalsIgnoreCase(status)) {
+            mailService.sendServiceProviderApproved(owner.getEmail(), owner.getName(), owner.getBusinessName());
+        } else if (STATUS_REJECTED.equalsIgnoreCase(status)) {
+            mailService.sendServiceProviderRejected(owner.getEmail(), owner.getName(), owner.getBusinessName(), notes);
+        }
+
         return toUserDto(owner);
     }
 

@@ -290,6 +290,65 @@ public class MailService {
         send(toEmail, "Welcome to BiasharaHub – verify your account", text);
     }
 
+    /**
+     * Notify service provider their application has been approved.
+     */
+    public void sendServiceProviderApproved(@NonNull String toEmail, @NonNull String name, String businessName) {
+        String bizInfo = businessName != null && !businessName.isBlank() ? " for " + businessName : "";
+        String text = """
+                Hi %s,
+
+                Great news! Your service provider application%s has been approved!
+
+                What happens next:
+                1. Log in to your BiasharaHub dashboard
+                2. Go to "My Services" to create your service offerings
+                3. Add details like service name, description, pricing, and duration
+                4. Your services will then be listed on the platform for customers to book
+
+                Tips for success:
+                - Add clear descriptions of what you offer
+                - Set competitive prices
+                - Include photos or videos to showcase your work
+                - Keep your availability up to date
+
+                Welcome to BiasharaHub! We're excited to have you on board.
+
+                If you have any questions, contact us at biasharahub@sysnovatechnologies.com or WhatsApp 0703520023.
+                """.formatted(name, bizInfo);
+        send(toEmail, "Congratulations! Your service provider application is approved", text);
+    }
+
+    /**
+     * Notify service provider their application has been rejected.
+     */
+    public void sendServiceProviderRejected(@NonNull String toEmail, @NonNull String name, String businessName, String reason) {
+        String bizInfo = businessName != null && !businessName.isBlank() ? " for " + businessName : "";
+        String reasonInfo = reason != null && !reason.isBlank() ? "\n\nReason: " + reason : "";
+        String text = """
+                Hi %s,
+
+                We regret to inform you that your service provider application%s has not been approved at this time.%s
+
+                What you can do:
+                1. Review the feedback provided above (if any)
+                2. Ensure your documents are clear and valid
+                3. Make sure your qualifications match your service category
+                4. Resubmit your application with updated information
+
+                To resubmit:
+                1. Log in to your BiasharaHub dashboard
+                2. Go to "Verification"
+                3. Update your documents and details
+                4. Submit again for review
+
+                If you believe this decision was made in error or have questions, please contact us at biasharahub@sysnovatechnologies.com or WhatsApp 0703520023.
+
+                Thank you for your interest in BiasharaHub.
+                """.formatted(name, bizInfo, reasonInfo);
+        send(toEmail, "Update on your service provider application", text);
+    }
+
     private void sendSafe(EmailMessage message, String description, String toEmail) {
         try {
             emailSender.send(message);
