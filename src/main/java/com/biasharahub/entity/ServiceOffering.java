@@ -84,6 +84,18 @@ public class ServiceOffering {
     @Builder.Default
     private Boolean isActive = true;
 
+    /** Main image URL to showcase this service. */
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
+    /** Optional video URL to demonstrate this service (YouTube, Vimeo, or direct link). */
+    @Column(name = "video_url", columnDefinition = "TEXT")
+    private String videoUrl;
+
+    /** Comma-separated list of additional image URLs for this service. */
+    @Column(name = "gallery_urls", columnDefinition = "TEXT")
+    private String galleryUrls;
+
     @Column(name = "created_at")
     private Instant createdAt;
 

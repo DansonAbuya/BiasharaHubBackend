@@ -49,6 +49,13 @@ public class CreateServiceOfferingRequest {
     /** Optional duration in minutes. */
     private Integer durationMinutes;
 
+    /** Main image URL to showcase this service. */
+    private String imageUrl;
+    /** Optional video URL to demonstrate this service (YouTube, Vimeo, or direct link). */
+    private String videoUrl;
+    /** Comma-separated list of additional image URLs for this service. */
+    private String galleryUrls;
+
     @NotNull(message = "Active flag is required")
     private Boolean isActive = true;
 }

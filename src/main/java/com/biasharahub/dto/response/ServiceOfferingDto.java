@@ -33,6 +33,12 @@ public class ServiceOfferingDto implements Serializable {
     private String paymentTiming;
     private Integer durationMinutes;
     private Boolean isActive;
+    /** Main image URL to showcase this service */
+    private String imageUrl;
+    /** Optional video URL to demonstrate this service */
+    private String videoUrl;
+    /** Comma-separated list of additional image URLs */
+    private String galleryUrls;
     private Instant createdAt;
     private Instant updatedAt;
 }

@@ -27,7 +27,9 @@ public class R2StorageService {
 
     private static final long MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
     private static final long MAX_VERIFICATION_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+    private static final long MAX_SERVICE_MEDIA_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB for images and videos
     private static final String ALLOWED_CONTENT_PREFIX = "image/";
+    private static final String ALLOWED_VIDEO_PREFIX = "video/";
     private static final String APPLICATION_PDF = "application/pdf";
 
     /**
@@ -60,6 +62,44 @@ public class R2StorageService {
 
         String publicUrl = buildPublicUrl(key);
         log.debug("Uploaded product image to R2: {}", publicUrl);
+        return publicUrl;
+    }
+
+    /**
+     * Uploads a service media file (image or video) to R2 and returns the public URL.
+     * Used for service offerings - showcase images and demo videos.
+     * 
+     * @param file the media file (image/* or video/*)
+     * @return public URL of the uploaded file
+     */
+    public String uploadServiceMedia(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("File must not be null or empty");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || contentType.isBlank()) {
+            throw new IllegalArgumentException("File content type is required");
+        }
+        String ct = contentType.toLowerCase();
+        boolean isImage = ct.startsWith(ALLOWED_CONTENT_PREFIX);
+        boolean isVideo = ct.startsWith(ALLOWED_VIDEO_PREFIX);
+        if (!isImage && !isVideo) {
+            throw new IllegalArgumentException("File must be an image (e.g. image/jpeg, image/png) or video (e.g. video/mp4, video/webm)");
+        }
+        if (file.getSize() > MAX_SERVICE_MEDIA_SIZE_BYTES) {
+            throw new IllegalArgumentException("File size must not exceed 20 MB");
+        }
+        String ext = isVideo ? "video" : "img";
+        String key = "services/" + UUID.randomUUID() + "-" + sanitizeFilename(file.getOriginalFilename(), ext);
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(r2Properties.getBucket())
+                .key(key)
+                .contentType(contentType)
+                .contentLength(file.getSize())
+                .build();
+        s3Client.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+        String publicUrl = buildPublicUrl(key);
+        log.debug("Uploaded service media to R2: {} (type: {})", publicUrl, contentType);
         return publicUrl;
     }
 

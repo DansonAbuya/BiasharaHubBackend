@@ -23,6 +23,7 @@ import com.biasharahub.repository.UserRepository;
 import com.biasharahub.service.GoogleCalendarMeetService;
 import com.biasharahub.service.InAppNotificationService;
 import com.biasharahub.service.MpesaClient;
+import com.biasharahub.service.R2StorageService;
 import com.biasharahub.service.ServiceBookingEscrowService;
 import com.biasharahub.service.SmsNotificationService;
 import com.biasharahub.service.WhatsAppNotificationService;
@@ -30,8 +31,11 @@ import com.biasharahub.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -63,6 +67,9 @@ public class ServiceOfferingController {
     private final SmsNotificationService smsNotificationService;
     private final ServiceBookingEscrowService serviceBookingEscrowService;
     private final GoogleCalendarMeetService googleCalendarMeetService;
+
+    @Autowired(required = false)
+    private R2StorageService r2StorageService;
 
     /**
      * Whether the current user can offer services. Uses service provider verification (separate from product seller verification).
@@ -104,8 +111,10 @@ public class ServiceOfferingController {
 
     /**
      * List verified service providers with their location info.
-     * Public endpoint for map-based search. Only shows providers who offer PHYSICAL or BOTH delivery types
-     * and have location set. Optionally filter by category, delivery type, or search query.
+     * Public endpoint for browsing and map-based search. Shows all verified providers.
+     * For PHYSICAL or BOTH delivery types, location must be set.
+     * ONLINE-only providers are included without location requirement.
+     * Optionally filter by category, delivery type, or search query.
      */
     @GetMapping("/providers")
     public List<ServiceProviderLocationDto> listServiceProviders(
@@ -117,11 +126,15 @@ public class ServiceOfferingController {
 
         return verifiedProviders.stream()
                 .filter(u -> {
-                    // Only include providers with PHYSICAL or BOTH delivery type who have location set
+                    // Include all verified providers with valid delivery type
                     String dt = u.getServiceDeliveryType();
                     if (dt == null) return false;
-                    if (!"PHYSICAL".equalsIgnoreCase(dt) && !"BOTH".equalsIgnoreCase(dt)) return false;
-                    return u.getServiceLocationLat() != null && u.getServiceLocationLng() != null;
+                    // For PHYSICAL or BOTH, require location to be set
+                    if ("PHYSICAL".equalsIgnoreCase(dt) || "BOTH".equalsIgnoreCase(dt)) {
+                        return u.getServiceLocationLat() != null && u.getServiceLocationLng() != null;
+                    }
+                    // ONLINE providers don't need location
+                    return "ONLINE".equalsIgnoreCase(dt);
                 })
                 .filter(u -> {
                     // Filter by delivery type if specified
@@ -279,6 +292,9 @@ public class ServiceOfferingController {
                 .onlineDeliveryMethods(request.getOnlineDeliveryMethods())
                 .paymentTiming(request.getPaymentTiming() != null && !request.getPaymentTiming().isBlank() ? request.getPaymentTiming() : "BEFORE_BOOKING")
                 .durationMinutes(request.getDurationMinutes())
+                .imageUrl(request.getImageUrl())
+                .videoUrl(request.getVideoUrl())
+                .galleryUrls(request.getGalleryUrls())
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
         s = serviceOfferingRepository.save(s);
@@ -311,6 +327,9 @@ public class ServiceOfferingController {
                     if (request.getOnlineDeliveryMethods() != null) s.setOnlineDeliveryMethods(request.getOnlineDeliveryMethods());
                     if (request.getPaymentTiming() != null) s.setPaymentTiming(request.getPaymentTiming());
                     if (request.getDurationMinutes() != null) s.setDurationMinutes(request.getDurationMinutes());
+                    if (request.getImageUrl() != null) s.setImageUrl(request.getImageUrl());
+                    if (request.getVideoUrl() != null) s.setVideoUrl(request.getVideoUrl());
+                    if (request.getGalleryUrls() != null) s.setGalleryUrls(request.getGalleryUrls());
                     if (request.getIsActive() != null) s.setIsActive(request.getIsActive());
                     ServiceOffering saved = serviceOfferingRepository.save(s);
                     return ResponseEntity.ok(toDto(saved));
@@ -330,6 +349,39 @@ public class ServiceOfferingController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
+    }
+
+    /**
+     * Upload service media (image or video) for showcasing a service.
+     * Supports images (JPEG, PNG, GIF, WebP) and videos (MP4, WebM, MOV, AVI).
+     * Max file size: 20 MB.
+     * 
+     * @return JSON with the public URL of the uploaded file
+     */
+    @PostMapping(value = "/media/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
+    public ResponseEntity<?> uploadServiceMedia(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        if (r2StorageService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", "File upload is not configured (R2 disabled). Please use a URL instead."));
+        }
+        UUID businessId = getBusinessId(currentUser);
+        if (businessId == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "No business associated with user"));
+        }
+        try {
+            String url = r2StorageService.uploadServiceMedia(file);
+            return ResponseEntity.ok(Map.of("url", url));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to upload service media", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to upload file: " + e.getMessage()));
+        }
     }
 
     // ---------- Appointments (physical: book then attend; virtual: book, pay, meeting link, confirm/dispute for escrow) ----------
@@ -649,6 +701,9 @@ public class ServiceOfferingController {
                 .paymentTiming(s.getPaymentTiming() != null ? s.getPaymentTiming() : "BEFORE_BOOKING")
                 .durationMinutes(s.getDurationMinutes())
                 .isActive(s.getIsActive())
+                .imageUrl(s.getImageUrl())
+                .videoUrl(s.getVideoUrl())
+                .galleryUrls(s.getGalleryUrls())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
                 .build();
