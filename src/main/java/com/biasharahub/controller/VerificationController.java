@@ -1,11 +1,14 @@
 package com.biasharahub.controller;
 
+import com.biasharahub.dto.request.ServiceProviderApplyRequest;
 import com.biasharahub.dto.response.OwnerVerificationDocumentDto;
+import com.biasharahub.dto.response.ServiceProviderDocumentDto;
 import com.biasharahub.dto.response.UserDto;
 import com.biasharahub.dto.response.VerificationChecklistDto;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.OwnerVerificationService;
 import com.biasharahub.service.R2StorageService;
+import com.biasharahub.service.ServiceProviderVerificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,6 +33,7 @@ import java.util.UUID;
 public class VerificationController {
 
     private final OwnerVerificationService verificationService;
+    private final ServiceProviderVerificationService serviceProviderVerificationService;
     private final Optional<R2StorageService> r2StorageService;
 
     @PostMapping("/documents")
@@ -135,6 +139,55 @@ public class VerificationController {
         String notes = body.get("notes");
         String tier = body.getOrDefault("sellerTier", body.getOrDefault("tier", null));
         UserDto updated = verificationService.setVerificationStatus(ownerId, status, notes, admin, tier);
+        return ResponseEntity.ok(updated);
+    }
+
+    // ---------- Service provider verification (separate journey from product seller) ----------
+
+    @PostMapping("/service-provider/apply")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<UserDto> applyServiceProvider(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestBody ServiceProviderApplyRequest request) {
+        UserDto dto = serviceProviderVerificationService.apply(user, request);
+        return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/service-provider/status")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<UserDto> getServiceProviderStatus(@AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(serviceProviderVerificationService.getMyStatus(user));
+    }
+
+    @GetMapping("/service-provider/documents")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<List<ServiceProviderDocumentDto>> getServiceProviderDocuments(
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(serviceProviderVerificationService.getMyDocuments(user));
+    }
+
+    @GetMapping("/admin/pending-service-providers")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+    public ResponseEntity<List<UserDto>> listPendingServiceProviders() {
+        return ResponseEntity.ok(serviceProviderVerificationService.listPendingServiceProviders());
+    }
+
+    @GetMapping("/admin/service-providers/{ownerId}/documents")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+    public ResponseEntity<List<ServiceProviderDocumentDto>> getServiceProviderDocumentsForOwner(
+            @PathVariable UUID ownerId) {
+        return ResponseEntity.ok(serviceProviderVerificationService.getDocumentsForOwner(ownerId));
+    }
+
+    @PatchMapping("/admin/service-providers/{ownerId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+    public ResponseEntity<UserDto> setServiceProviderVerification(
+            @PathVariable UUID ownerId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal AuthenticatedUser admin) {
+        String status = body.get("status");
+        String notes = body.get("notes");
+        UserDto updated = serviceProviderVerificationService.setServiceProviderStatus(ownerId, status, notes, admin);
         return ResponseEntity.ok(updated);
     }
 }

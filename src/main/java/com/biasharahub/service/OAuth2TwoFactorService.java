@@ -30,6 +30,8 @@ import java.util.Optional;
 public class OAuth2TwoFactorService {
 
     private static final String REGISTRATION_ID = "google";
+    /** Placeholder when GOOGLE_CLIENT_ID is not set; app starts but OAuth2 2FA is disabled. */
+    private static final String CLIENT_ID_DISABLED = "disabled";
 
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final Pending2FAStore pending2FAStore;
@@ -48,7 +50,7 @@ public class OAuth2TwoFactorService {
      */
     public Optional<String> buildAuthorizationUrl(String stateToken) {
         ClientRegistration reg = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
-        if (reg == null || reg.getClientId() == null || reg.getClientId().isBlank()) {
+        if (reg == null || reg.getClientId() == null || reg.getClientId().isBlank() || CLIENT_ID_DISABLED.equals(reg.getClientId())) {
             return Optional.empty();
         }
         String redirectUri = backendBaseUrl + "/auth/oauth2/callback";
@@ -74,7 +76,7 @@ public class OAuth2TwoFactorService {
         Pending2FA p = pending.get();
 
         ClientRegistration reg = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
-        if (reg == null) {
+        if (reg == null || reg.getClientId() == null || CLIENT_ID_DISABLED.equals(reg.getClientId())) {
             return Optional.empty();
         }
 

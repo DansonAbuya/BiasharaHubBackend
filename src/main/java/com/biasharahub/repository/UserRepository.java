@@ -24,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     /** Find verified owners with a business (for marketplace “shops” list — only these have visible stores). */
     List<User> findByRoleIgnoreCaseAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc(String role, String verificationStatus);
 
+    /** Find owners verified as service providers (for marketplace services list). */
+    List<User> findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc(String role, String serviceProviderStatus);
+
     /** Find users by role (e.g. customers for staff/owner "order for" dropdown). */
     List<User> findByRoleIgnoreCaseOrderByNameAsc(String role);
 
@@ -32,4 +35,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     /** Find owners pending verification for admin review queue. */
     List<User> findByRoleIgnoreCaseAndVerificationStatusOrderByCreatedAtAsc(String role, String verificationStatus);
+
+    /** Find owners pending service provider verification. */
+    List<User> findByRoleIgnoreCaseAndServiceProviderStatusOrderByCreatedAtAsc(String role, String serviceProviderStatus);
 }

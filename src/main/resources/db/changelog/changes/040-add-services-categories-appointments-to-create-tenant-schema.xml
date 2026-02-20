@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="040-add-services-categories-appointments-to-create-tenant-schema" author="BiasharaHub">
+        <comment>New tenants get service_categories, service_offerings.service_category_id, service_appointments</comment>
+        <sqlFile path="db/changelog/changes/040-add-services-categories-appointments-to-create-tenant-schema.sql" splitStatements="false"/>
+    </changeSet>
+</databaseChangeLog>

@@ -127,6 +127,30 @@ public class User {
     @Column(name = "applying_for_tier", length = 32)
     private String applyingForTier;
 
+    // --- Service provider verification (separate from product seller verification) ---
+
+    /** Service provider verification: pending, verified, rejected. Enables listing services. */
+    @Column(name = "service_provider_status", length = 32)
+    @Builder.Default
+    private String serviceProviderStatus = "pending";
+
+    @Column(name = "service_provider_notes", columnDefinition = "TEXT")
+    private String serviceProviderNotes;
+
+    /** Primary service category approved for this provider (e.g. Consulting, Repair). */
+    @Column(name = "service_provider_category_id")
+    private UUID serviceProviderCategoryId;
+
+    /** How they offer services: ONLINE, PHYSICAL, or BOTH. */
+    @Column(name = "service_delivery_type", length = 32)
+    private String serviceDeliveryType;
+
+    @Column(name = "service_provider_verified_at")
+    private Instant serviceProviderVerifiedAt;
+
+    @Column(name = "service_provider_verified_by_user_id")
+    private UUID serviceProviderVerifiedByUserId;
+
     /** Trust & Safety: total strike count (late_shipping=1, wrong_item=2, fraud=3 per incident). 3+=suspended, 5+=banned. */
     @Column(name = "strike_count")
     @Builder.Default

@@ -31,4 +31,12 @@ public class UserDto {
     private Integer strikeCount;
     /** Trust & Safety: active, suspended, banned. */
     private String accountStatus;
+
+    // --- Service provider verification (separate from product seller) ---
+    private String serviceProviderStatus;
+    private String serviceProviderNotes;
+    private UUID serviceProviderCategoryId;
+    private String serviceDeliveryType;
+    private java.time.Instant serviceProviderVerifiedAt;
+    private UUID serviceProviderVerifiedByUserId;
 }
