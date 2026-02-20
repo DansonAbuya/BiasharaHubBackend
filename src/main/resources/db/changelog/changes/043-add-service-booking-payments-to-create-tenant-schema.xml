@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="043-add-service-booking-payments-to-create-tenant-schema" author="BiasharaHub">
+        <comment>Add service_booking_payments to create_tenant_schema for new tenants</comment>
+        <sqlFile path="db/changelog/changes/043-add-service-booking-payments-to-create-tenant-schema.sql" splitStatements="false"/>
+    </changeSet>
+</databaseChangeLog>

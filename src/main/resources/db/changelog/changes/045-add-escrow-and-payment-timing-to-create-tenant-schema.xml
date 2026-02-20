@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="045-add-escrow-and-payment-timing-to-create-tenant-schema" author="BiasharaHub">
+        <comment>New tenants: service_offerings meeting_link/payment_timing, service_appointments evidence/escrow columns, service_booking_escrow table</comment>
+        <sqlFile path="db/changelog/changes/045-add-escrow-and-payment-timing-to-create-tenant-schema.sql" splitStatements="false"/>
+    </changeSet>
+</databaseChangeLog>

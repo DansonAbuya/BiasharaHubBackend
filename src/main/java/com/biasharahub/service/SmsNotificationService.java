@@ -3,6 +3,7 @@ package com.biasharahub.service;
 import com.biasharahub.entity.Order;
 import com.biasharahub.entity.OrderItem;
 import com.biasharahub.entity.Product;
+import com.biasharahub.entity.ServiceAppointment;
 import com.biasharahub.entity.User;
 import com.biasharahub.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -116,6 +117,41 @@ public class SmsNotificationService {
             if (u.getPhone() != null && !u.getPhone().isBlank()) {
                 smsClient.send(u.getPhone(), body);
             }
+        }
+    }
+
+    // ---------- Service bookings (BiasharaHub Services) ----------
+
+    /** Notify provider (owner + staff) when a new service appointment is booked. */
+    public void notifyProviderServiceBookingCreated(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getService() == null || appointment.getService().getBusinessId() == null) return;
+        UUID businessId = appointment.getService().getBusinessId();
+        String customerName = appointment.getUser() != null && appointment.getUser().getName() != null
+                ? appointment.getUser().getName()
+                : (appointment.getUser() != null ? appointment.getUser().getEmail() : "a customer");
+        String serviceName = appointment.getService().getName() != null ? appointment.getService().getName() : "your service";
+        String dateTime = appointment.getRequestedDate() != null ? appointment.getRequestedDate().toString() : "";
+        if (appointment.getRequestedTime() != null) dateTime += " at " + appointment.getRequestedTime();
+        String body = String.format(
+                "BiasharaHub: New booking for \"%s\" from %s on %s. Log in to confirm.",
+                serviceName, customerName, dateTime);
+        for (User u : getSellerUsers(businessId)) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) smsClient.send(u.getPhone(), body);
+        }
+    }
+
+    /** Notify provider when a service booking is paid. */
+    public void notifyProviderServiceBookingPaymentCompleted(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getService() == null || appointment.getService().getBusinessId() == null) return;
+        UUID businessId = appointment.getService().getBusinessId();
+        String serviceName = appointment.getService().getName() != null ? appointment.getService().getName() : "service";
+        String customerName = appointment.getUser() != null && appointment.getUser().getName() != null
+                ? appointment.getUser().getName() : "a customer";
+        String body = String.format(
+                "BiasharaHub: Payment received for \"%s\" from %s. See dashboard.",
+                serviceName, customerName);
+        for (User u : getSellerUsers(businessId)) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) smsClient.send(u.getPhone(), body);
         }
     }
 }

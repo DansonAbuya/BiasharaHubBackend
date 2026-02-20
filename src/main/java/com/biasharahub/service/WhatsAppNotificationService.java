@@ -4,6 +4,7 @@ import com.biasharahub.entity.Order;
 import com.biasharahub.entity.OrderItem;
 import com.biasharahub.entity.Payment;
 import com.biasharahub.entity.Product;
+import com.biasharahub.entity.ServiceAppointment;
 import com.biasharahub.entity.Shipment;
 import com.biasharahub.entity.User;
 import com.biasharahub.repository.OrderRepository;
@@ -142,6 +143,90 @@ public class WhatsAppNotificationService {
             if (u.getPhone() != null && !u.getPhone().isBlank()) {
                 client.sendMessage(u.getPhone(), body);
             }
+        }
+    }
+
+    // ---------- Service bookings (BiasharaHub Services) ----------
+
+    /** Notify customer that their service appointment was booked. */
+    public void notifyServiceBookingCreated(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getUser() == null) return;
+        String phone = appointment.getUser().getPhone();
+        if (phone == null || phone.isBlank()) return;
+        String serviceName = appointment.getService() != null ? appointment.getService().getName() : "your service";
+        String dateTime = appointment.getRequestedDate() != null ? appointment.getRequestedDate().toString() : "";
+        if (appointment.getRequestedTime() != null) dateTime += " at " + appointment.getRequestedTime();
+        String body = String.format(
+                "BiasharaHub: Your appointment for \"%s\" on %s has been booked. Pay in the app to confirm.",
+                serviceName, dateTime);
+        client.sendMessage(phone, body);
+    }
+
+    /** Notify provider (owner + staff) when a new service appointment is booked. */
+    public void notifyProviderServiceBookingCreated(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getService() == null || appointment.getService().getBusinessId() == null) return;
+        String customerName = appointment.getUser() != null && appointment.getUser().getName() != null
+                ? appointment.getUser().getName()
+                : (appointment.getUser() != null ? appointment.getUser().getEmail() : "a customer");
+        String serviceName = appointment.getService().getName() != null ? appointment.getService().getName() : "your service";
+        String dateTime = appointment.getRequestedDate() != null ? appointment.getRequestedDate().toString() : "";
+        if (appointment.getRequestedTime() != null) dateTime += " at " + appointment.getRequestedTime();
+        String body = String.format(
+                "BiasharaHub: New booking for \"%s\" from %s on %s. Log in to confirm.",
+                serviceName, customerName, dateTime);
+        for (User u : getSellerUsers(appointment.getService().getBusinessId())) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) client.sendMessage(u.getPhone(), body);
+        }
+    }
+
+    /** Notify customer and provider with meeting link (virtual, booking confirmed). */
+    public void notifyServiceMeetingLinkSent(ServiceAppointment appointment, String meetingLink) {
+        if (appointment == null || meetingLink == null || meetingLink.isBlank()) return;
+        String serviceName = appointment.getService() != null ? appointment.getService().getName() : "your service";
+        if (appointment.getUser() != null) {
+            String phone = appointment.getUser().getPhone();
+            if (phone != null && !phone.isBlank()) {
+                client.sendMessage(phone, "BiasharaHub: Meeting link for \"" + serviceName + "\": " + meetingLink);
+            }
+        }
+        if (appointment.getService() != null && appointment.getService().getBusinessId() != null) {
+            String body = "BiasharaHub: Meeting link for \"" + serviceName + "\": " + meetingLink;
+            for (User u : getSellerUsers(appointment.getService().getBusinessId())) {
+                if (u.getPhone() != null && !u.getPhone().isBlank()) client.sendMessage(u.getPhone(), body);
+            }
+        }
+    }
+
+    /** Notify customer when appointment status changes. */
+    public void notifyServiceBookingStatusUpdated(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getUser() == null) return;
+        String phone = appointment.getUser().getPhone();
+        if (phone == null || phone.isBlank()) return;
+        String serviceName = appointment.getService() != null ? appointment.getService().getName() : "your service";
+        String status = appointment.getStatus() != null ? appointment.getStatus() : "";
+        String body = String.format("BiasharaHub: Your appointment for \"%s\" is now %s.", serviceName, status);
+        client.sendMessage(phone, body);
+    }
+
+    /** Notify customer that their booking payment was received. */
+    public void notifyServiceBookingPaymentCompletedCustomer(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getUser() == null) return;
+        String phone = appointment.getUser().getPhone();
+        if (phone == null || phone.isBlank()) return;
+        String serviceName = appointment.getService() != null ? appointment.getService().getName() : "your service";
+        String body = String.format("BiasharaHub: Payment received for \"%s\". Your booking is confirmed.", serviceName);
+        client.sendMessage(phone, body);
+    }
+
+    /** Notify provider when a service booking is paid. */
+    public void notifyServiceBookingPaymentCompletedProvider(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getService() == null || appointment.getService().getBusinessId() == null) return;
+        String serviceName = appointment.getService().getName() != null ? appointment.getService().getName() : "service";
+        String customerName = appointment.getUser() != null && appointment.getUser().getName() != null
+                ? appointment.getUser().getName() : "a customer";
+        String body = String.format("BiasharaHub: Payment received for \"%s\" from %s. See dashboard.", serviceName, customerName);
+        for (User u : getSellerUsers(appointment.getService().getBusinessId())) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) client.sendMessage(u.getPhone(), body);
         }
     }
 

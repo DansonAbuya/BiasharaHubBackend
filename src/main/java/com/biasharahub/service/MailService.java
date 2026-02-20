@@ -109,6 +109,33 @@ public class MailService {
     }
 
     /**
+     * Welcome email for a service provider onboarded by admin. They receive a verification code (temporary password)
+     * to log in, then must add service category, service details, and upload verification and qualification documents.
+     */
+    public void sendWelcomeServiceProvider(@NonNull String toEmail, @NonNull String name, String businessName, @NonNull String temporaryPassword) {
+        String businessLine = (businessName != null && !businessName.isBlank())
+                ? "Your service provider account for \"" + businessName + "\" has been set up on BiasharaHub."
+                : "You have been onboarded as a service provider on BiasharaHub.";
+        String text = """
+                Hi %s,
+
+                %s
+
+                Your verification code (temporary password) to log in is: %s
+
+                After logging in:
+                1. Go to Verification → Offer services: choose your service category, how you deliver (online, in-person, or both), and upload verification and qualification/expertise documents.
+                2. Add your service offerings in Dashboard → Services (name, price, description).
+                3. An admin will verify your documents and approve your account. Once approved, your services will be listed on the platform for customers.
+
+                Please change your password after first login and enable two-factor authentication in Settings.
+
+                If you did not expect this email, please contact support.
+                """.formatted(name, businessLine, temporaryPassword);
+        send(toEmail, "Welcome to BiasharaHub – Service provider account", text);
+    }
+
+    /**
      * Welcome email for a new staff member (added by owner). Includes business name and temporary password.
      */
     public void sendWelcomeStaff(@NonNull String toEmail, @NonNull String name, String businessName, @NonNull String temporaryPassword) {

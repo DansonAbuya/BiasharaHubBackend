@@ -188,6 +188,12 @@ public class OwnerVerificationService {
                 .applyingForTier(u.getApplyingForTier())
                 .strikeCount(u.getStrikeCount())
                 .accountStatus(u.getAccountStatus())
+                .serviceProviderStatus(u.getServiceProviderStatus())
+                .serviceProviderNotes(u.getServiceProviderNotes())
+                .serviceProviderCategoryId(u.getServiceProviderCategoryId())
+                .serviceDeliveryType(u.getServiceDeliveryType())
+                .serviceProviderVerifiedAt(u.getServiceProviderVerifiedAt())
+                .serviceProviderVerifiedByUserId(u.getServiceProviderVerifiedByUserId())
                 .build();
     }
 }
