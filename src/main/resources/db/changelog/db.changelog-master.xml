@@ -39,5 +39,19 @@
     <include file="db/changelog/changes/032-update-create-tenant-schema-courier-support.xml"/>
     <include file="db/changelog/changes/033-tenant-expenses-table.xml"/>
     <include file="db/changelog/changes/034-add-expenses-to-create-tenant-schema.xml"/>
+    <include file="db/changelog/changes/035-tenant-service-offerings-table.xml"/>
+    <include file="db/changelog/changes/036-add-service-offerings-to-create-tenant-schema.xml"/>
+    <include file="db/changelog/changes/037-tenant-service-categories.xml"/>
+    <include file="db/changelog/changes/038-add-service-category-id-to-offerings.xml"/>
+    <include file="db/changelog/changes/039-tenant-service-appointments.xml"/>
+    <include file="db/changelog/changes/040-add-services-categories-appointments-to-create-tenant-schema.xml"/>
+    <include file="db/changelog/changes/041-seed-all-service-categories.xml"/>
+    <include file="db/changelog/changes/042-tenant-service-booking-payments.xml"/>
+    <include file="db/changelog/changes/043-add-service-booking-payments-to-create-tenant-schema.xml"/>
+    <include file="db/changelog/changes/044-service-escrow-meeting-evidence-payment-timing.xml"/>
+    <include file="db/changelog/changes/045-add-escrow-and-payment-timing-to-create-tenant-schema.xml"/>
+    <include file="db/changelog/changes/046-tenant-service-contracts.xml"/>
+    <include file="db/changelog/changes/047-appointment-meeting-link-google-event-id.xml"/>
+    <include file="db/changelog/changes/048-service-provider-verification.xml"/>
 
 </databaseChangeLog>

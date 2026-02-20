@@ -4,6 +4,7 @@ import com.biasharahub.config.TenantContext;
 import com.biasharahub.dto.request.AddAssistantAdminRequest;
 import com.biasharahub.dto.request.AddCourierRequest;
 import com.biasharahub.dto.request.AddOwnerRequest;
+import com.biasharahub.dto.request.AddServiceProviderRequest;
 import com.biasharahub.dto.request.AddStaffRequest;
 import com.biasharahub.dto.response.UserDto;
 import com.biasharahub.entity.Tenant;
@@ -83,6 +84,37 @@ public class UserService {
         tenantRepository.save(tenant);
 
         mailService.sendWelcomeOwner(owner.getEmail(), owner.getName(), owner.getBusinessName(), tempPassword);
+        return toUserDto(owner);
+    }
+
+    /**
+     * Platform admin onboard a service provider. Creates owner with business; sends verification code (temporary password) by email.
+     * Service provider logs in, adds service category and details, uploads verification and qualification documents;
+     * admin verifies and approves so services can be listed.
+     */
+    @Transactional
+    public UserDto addServiceProvider(AddServiceProviderRequest request) {
+        if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
+            throw new IllegalArgumentException("Email already registered");
+        }
+        Tenant tenant = resolveCurrentTenant();
+        if (tenant == null) {
+            throw new IllegalStateException("Tenant context required when adding a service provider. Send X-Tenant-ID header.");
+        }
+        String tempPassword = generateTemporaryPassword();
+        String businessName = request.getBusinessName() != null ? request.getBusinessName().trim() : null;
+        User owner = User.builder()
+                .email(request.getEmail().toLowerCase())
+                .passwordHash(passwordEncoder.encode(tempPassword))
+                .name(request.getName())
+                .role("owner")
+                .twoFactorEnabled(false)
+                .businessName(businessName)
+                .build();
+        owner = userRepository.save(owner);
+        owner.setBusinessId(owner.getUserId());
+        owner = userRepository.save(owner);
+        mailService.sendWelcomeServiceProvider(owner.getEmail(), owner.getName(), owner.getBusinessName(), tempPassword);
         return toUserDto(owner);
     }
 

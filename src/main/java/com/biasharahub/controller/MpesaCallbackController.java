@@ -3,10 +3,18 @@ package com.biasharahub.controller;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.biasharahub.entity.Payment;
+import com.biasharahub.entity.ServiceBookingEscrow;
+import com.biasharahub.entity.ServiceBookingPayment;
 import com.biasharahub.repository.PaymentRepository;
+import com.biasharahub.repository.ServiceAppointmentRepository;
+import com.biasharahub.repository.ServiceBookingEscrowRepository;
+import com.biasharahub.repository.ServiceBookingPaymentRepository;
+import com.biasharahub.service.InAppNotificationService;
 import com.biasharahub.service.OrderEventPublisher;
 import com.biasharahub.service.PayoutService;
+import com.biasharahub.service.SmsNotificationService;
 import com.biasharahub.service.TenantWalletService;
+import com.biasharahub.service.WhatsAppNotificationService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,9 +39,15 @@ import java.util.Optional;
 public class MpesaCallbackController {
 
     private final PaymentRepository paymentRepository;
+    private final ServiceBookingPaymentRepository serviceBookingPaymentRepository;
+    private final ServiceBookingEscrowRepository serviceBookingEscrowRepository;
+    private final ServiceAppointmentRepository serviceAppointmentRepository;
     private final TenantWalletService tenantWalletService;
     private final OrderEventPublisher orderEventPublisher;
     private final PayoutService payoutService;
+    private final InAppNotificationService inAppNotificationService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
+    private final SmsNotificationService smsNotificationService;
 
     @PostMapping("/stk-callback")
     @Transactional
@@ -51,37 +65,72 @@ public class MpesaCallbackController {
                         .filter(p -> callback.getCheckoutRequestId().equals(p.getTransactionId()))
                         .findFirst();
 
-        if (optPayment.isEmpty()) {
+        if (optPayment.isPresent()) {
+            Payment payment = optPayment.get();
+            if (callback.getResultCode() != 0) {
+                payment.setPaymentStatus("failed");
+                paymentRepository.save(payment);
+                return ResponseEntity.ok().build();
+            }
+            BigDecimal amount = extractAmount(callback.getCallbackMetadata());
+            if (amount == null) amount = payment.getAmount();
+            payment.setPaymentStatus("completed");
+            String receipt = extractReceipt(callback.getCallbackMetadata());
+            if (receipt != null) payment.setTransactionId(receipt);
+            paymentRepository.save(payment);
+            tenantWalletService.recordIncomingPaymentForCurrentTenant(
+                    amount, payment.getOrder().getOrderId().toString(), payment.getPaymentId().toString());
+            orderEventPublisher.paymentCompleted(payment.getOrder().getOrderId(), payment.getPaymentId());
+            return ResponseEntity.ok().build();
+        }
+
+        // Not an order payment: try service booking payment
+        Optional<ServiceBookingPayment> optBookingPayment =
+                serviceBookingPaymentRepository.findByTransactionId(callback.getCheckoutRequestId());
+        if (optBookingPayment.isEmpty()) {
             log.warn("M-Pesa callback for unknown checkoutRequestId={}", callback.getCheckoutRequestId());
             return ResponseEntity.ok().build();
         }
 
-        Payment payment = optPayment.get();
-
+        ServiceBookingPayment bookingPayment = optBookingPayment.get();
         if (callback.getResultCode() != 0) {
-            payment.setPaymentStatus("failed");
-            paymentRepository.save(payment);
+            bookingPayment.setPaymentStatus("failed");
+            serviceBookingPaymentRepository.save(bookingPayment);
             return ResponseEntity.ok().build();
         }
-
         BigDecimal amount = extractAmount(callback.getCallbackMetadata());
-        if (amount == null) {
-            amount = payment.getAmount();
-        }
-
-        payment.setPaymentStatus("completed");
-        // Optionally overwrite transactionId with receipt number for easier reconciliation
+        if (amount == null) amount = bookingPayment.getAmount();
+        bookingPayment.setPaymentStatus("completed");
         String receipt = extractReceipt(callback.getCallbackMetadata());
-        if (receipt != null) {
-            payment.setTransactionId(receipt);
+        if (receipt != null) bookingPayment.setTransactionId(receipt);
+        serviceBookingPaymentRepository.save(bookingPayment);
+        var appointment = bookingPayment.getAppointment();
+        boolean isVirtual = appointment.getService() != null && "VIRTUAL".equalsIgnoreCase(appointment.getService().getDeliveryType());
+        if (isVirtual) {
+            // Virtual: hold in escrow until customer confirms or disputes
+            ServiceBookingEscrow escrow = ServiceBookingEscrow.builder()
+                    .appointment(appointment)
+                    .bookingPayment(bookingPayment)
+                    .amount(amount)
+                    .status("HELD")
+                    .build();
+            serviceBookingEscrowRepository.save(escrow);
+            appointment.setEscrowStatus("HELD");
+            serviceAppointmentRepository.save(appointment);
+        } else {
+            // Physical (pay before): credit provider wallet immediately
+            tenantWalletService.recordIncomingPaymentForCurrentTenant(
+                    amount, "appointment:" + appointment.getAppointmentId(), bookingPayment.getPaymentId().toString());
         }
-        paymentRepository.save(payment);
-
-        // Credit current tenant wallet and publish event
-        tenantWalletService.recordIncomingPaymentForCurrentTenant(
-                amount, payment.getOrder().getOrderId().toString(), payment.getPaymentId().toString());
-        orderEventPublisher.paymentCompleted(payment.getOrder().getOrderId(), payment.getPaymentId());
-
+        try {
+            inAppNotificationService.notifyServiceBookingPaymentCompletedCustomer(appointment);
+            inAppNotificationService.notifyServiceBookingPaymentCompletedProvider(appointment);
+            whatsAppNotificationService.notifyServiceBookingPaymentCompletedCustomer(appointment);
+            whatsAppNotificationService.notifyServiceBookingPaymentCompletedProvider(appointment);
+            smsNotificationService.notifyProviderServiceBookingPaymentCompleted(appointment);
+        } catch (Exception ex) {
+            log.warn("Failed to send service booking payment notifications: {}", ex.getMessage());
+        }
         return ResponseEntity.ok().build();
     }
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="035-tenant-service-offerings-table" author="BiasharaHub">
+        <comment>BiasharaHub Services module: service_offerings table in all tenant schemas</comment>
+        <sqlFile path="db/changelog/changes/035-tenant-service-offerings-table.sql" splitStatements="false"/>
+    </changeSet>
+</databaseChangeLog>

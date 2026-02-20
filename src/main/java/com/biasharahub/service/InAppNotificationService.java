@@ -4,6 +4,7 @@ import com.biasharahub.entity.Notification;
 import com.biasharahub.entity.Order;
 import com.biasharahub.entity.Payment;
 import com.biasharahub.entity.Product;
+import com.biasharahub.entity.ServiceAppointment;
 import com.biasharahub.entity.Shipment;
 import com.biasharahub.entity.User;
 import com.biasharahub.entity.OrderItem;
@@ -57,10 +58,8 @@ public class InAppNotificationService {
         }
         java.util.UUID businessId = firstItem.getProduct().getBusinessId();
 
-        @SuppressWarnings("unchecked")
-        java.util.List<User> owners = (List<User>) (java.util.List<?>) userRepository.findByRoleAndBusinessId("owner", businessId);
-        @SuppressWarnings("unchecked")
-        java.util.List<User> staff = (List<User>) (java.util.List<?>) userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
         if ((owners == null || owners.isEmpty()) && (staff == null || staff.isEmpty())) {
             return;
         }
@@ -109,8 +108,8 @@ public class InAppNotificationService {
         OrderItem firstItem = order.getItems().get(0);
         if (firstItem == null || firstItem.getProduct() == null || firstItem.getProduct().getBusinessId() == null) return;
         UUID businessId = firstItem.getProduct().getBusinessId();
-        @SuppressWarnings("unchecked") List<User> owners = (List<User>) (List<?>) userRepository.findByRoleAndBusinessId("owner", businessId);
-        @SuppressWarnings("unchecked") List<User> staff = (List<User>) (List<?>) userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
         String title = "Order paid";
         String message = "Order " + order.getOrderNumber() + " has been paid. You can now prepare and dispatch.";
         String actionUrl = "/dashboard/orders";
@@ -124,8 +123,8 @@ public class InAppNotificationService {
     public void notifySellerLowStock(Product product) {
         if (product == null || product.getBusinessId() == null) return;
         int qty = product.getQuantity() != null ? product.getQuantity() : 0;
-        @SuppressWarnings("unchecked") List<User> owners = (List<User>) (List<?>) userRepository.findByRoleAndBusinessId("owner", product.getBusinessId());
-        @SuppressWarnings("unchecked") List<User> staff = (List<User>) (List<?>) userRepository.findByRoleAndBusinessId("staff", product.getBusinessId());
+        List<User> owners = userRepository.findByRoleAndBusinessId("owner", product.getBusinessId());
+        List<User> staff = userRepository.findByRoleAndBusinessId("staff", product.getBusinessId());
         String title = "Low stock alert";
         String message = "Product \"" + (product.getName() != null ? product.getName() : "Unknown") + "\" is running low (" + qty + " left). Consider restocking.";
         String actionUrl = "/dashboard/products";
@@ -141,8 +140,8 @@ public class InAppNotificationService {
         OrderItem firstItem = order.getItems().get(0);
         if (firstItem == null || firstItem.getProduct() == null || firstItem.getProduct().getBusinessId() == null) return;
         UUID businessId = firstItem.getProduct().getBusinessId();
-        @SuppressWarnings("unchecked") List<User> owners = (List<User>) (List<?>) userRepository.findByRoleAndBusinessId("owner", businessId);
-        @SuppressWarnings("unchecked") List<User> staff = (List<User>) (List<?>) userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
         String title = "Dispute opened";
         String message = "A customer opened a dispute for order " + order.getOrderNumber() + (disputeType != null && !disputeType.isBlank() ? " (" + disputeType + ")." : ".");
         String actionUrl = "/dashboard/admin/disputes";
@@ -158,8 +157,8 @@ public class InAppNotificationService {
         OrderItem firstItem = order.getItems().get(0);
         if (firstItem == null || firstItem.getProduct() == null || firstItem.getProduct().getBusinessId() == null) return;
         UUID businessId = firstItem.getProduct().getBusinessId();
-        @SuppressWarnings("unchecked") List<User> owners = (List<User>) (List<?>) userRepository.findByRoleAndBusinessId("owner", businessId);
-        @SuppressWarnings("unchecked") List<User> staff = (List<User>) (List<?>) userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
         String title = "Order cancelled";
         String message = "Order " + order.getOrderNumber() + " was cancelled. Inventory has been restored.";
         String actionUrl = "/dashboard/orders";
@@ -167,6 +166,102 @@ public class InAppNotificationService {
         List<User> staffList = staff != null ? staff : Collections.emptyList();
         for (User u : ownerList) saveNotification(u, "order", title, message, actionUrl);
         for (User u : staffList) saveNotification(u, "order", title, message, actionUrl);
+    }
+
+    // ---------- Service bookings (BiasharaHub Services) ----------
+
+    /** Notify customer that their service appointment was booked. */
+    public void notifyServiceBookingCreated(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getUser() == null) return;
+        String serviceName = appointment.getService() != null ? appointment.getService().getName() : "your service";
+        String dateTime = appointment.getRequestedDate() != null ? appointment.getRequestedDate().toString() : "";
+        if (appointment.getRequestedTime() != null) dateTime += " at " + appointment.getRequestedTime();
+        saveNotification(appointment.getUser(), "service_booking",
+                "Appointment booked",
+                "Your appointment for \"" + serviceName + "\" on " + dateTime + " has been booked. Pay to confirm.",
+                "/dashboard/services");
+    }
+
+    /** Notify provider (owner + staff) when a new service appointment is booked. */
+    public void notifyProviderServiceBookingCreated(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getService() == null || appointment.getService().getBusinessId() == null) return;
+        UUID businessId = appointment.getService().getBusinessId();
+        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        String customerName = appointment.getUser() != null && appointment.getUser().getName() != null
+                ? appointment.getUser().getName()
+                : (appointment.getUser() != null ? appointment.getUser().getEmail() : "a customer");
+        String serviceName = appointment.getService().getName() != null ? appointment.getService().getName() : "your service";
+        String dateTime = appointment.getRequestedDate() != null ? appointment.getRequestedDate().toString() : "";
+        if (appointment.getRequestedTime() != null) dateTime += " at " + appointment.getRequestedTime();
+        String title = "New service booking";
+        String message = String.format("%s booked \"%s\" for %s. Confirm in the dashboard.", customerName, serviceName, dateTime);
+        String actionUrl = "/dashboard/services";
+        List<User> ownerList = owners != null ? owners : Collections.emptyList();
+        List<User> staffList = staff != null ? staff : Collections.emptyList();
+        for (User u : ownerList) saveNotification(u, "service_booking", title, message, actionUrl);
+        for (User u : staffList) saveNotification(u, "service_booking", title, message, actionUrl);
+    }
+
+    /** Notify customer and provider that meeting link was sent (virtual service, booking confirmed). */
+    public void notifyServiceMeetingLinkSent(ServiceAppointment appointment, String meetingLink, String meetingDetails) {
+        if (appointment == null || meetingLink == null || meetingLink.isBlank()) return;
+        String serviceName = appointment.getService() != null ? appointment.getService().getName() : "your service";
+        String msg = "Your meeting link for \"" + serviceName + "\": " + meetingLink;
+        if (meetingDetails != null && !meetingDetails.isBlank()) msg += " " + meetingDetails;
+        if (appointment.getUser() != null) {
+            saveNotification(appointment.getUser(), "service_booking", "Meeting link", msg, "/dashboard/services");
+        }
+        if (appointment.getService() != null && appointment.getService().getBusinessId() != null) {
+            UUID businessId = appointment.getService().getBusinessId();
+            List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
+            List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+            String title = "Meeting link sent";
+            String providerMsg = "Meeting link for \"" + serviceName + "\" with " + (appointment.getUser() != null && appointment.getUser().getName() != null ? appointment.getUser().getName() : "customer") + ": " + meetingLink;
+            List<User> ownerList = owners != null ? owners : Collections.emptyList();
+            List<User> staffList = staff != null ? staff : Collections.emptyList();
+            for (User u : ownerList) saveNotification(u, "service_booking", title, providerMsg, "/dashboard/services");
+            for (User u : staffList) saveNotification(u, "service_booking", title, providerMsg, "/dashboard/services");
+        }
+    }
+
+    /** Notify customer when appointment status changes (confirmed, completed, cancelled). */
+    public void notifyServiceBookingStatusUpdated(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getUser() == null) return;
+        String serviceName = appointment.getService() != null ? appointment.getService().getName() : "your service";
+        String status = appointment.getStatus() != null ? appointment.getStatus() : "";
+        String title = "Appointment update";
+        String message = "Your appointment for \"" + serviceName + "\" is now " + status + ".";
+        saveNotification(appointment.getUser(), "service_booking", title, message, "/dashboard/services");
+    }
+
+    /** Notify customer that their booking payment was received. */
+    public void notifyServiceBookingPaymentCompletedCustomer(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getUser() == null) return;
+        String serviceName = appointment.getService() != null ? appointment.getService().getName() : "your service";
+        saveNotification(appointment.getUser(), "payment",
+                "Payment received",
+                "We received your payment for \"" + serviceName + "\". Your booking is confirmed.",
+                "/dashboard/services");
+    }
+
+    /** Notify provider (owner + staff) when a service booking is paid. */
+    public void notifyServiceBookingPaymentCompletedProvider(ServiceAppointment appointment) {
+        if (appointment == null || appointment.getService() == null || appointment.getService().getBusinessId() == null) return;
+        UUID businessId = appointment.getService().getBusinessId();
+        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        String serviceName = appointment.getService().getName() != null ? appointment.getService().getName() : "service";
+        String customerName = appointment.getUser() != null && appointment.getUser().getName() != null
+                ? appointment.getUser().getName()
+                : "a customer";
+        String title = "Booking payment received";
+        String message = String.format("Payment received for \"%s\" from %s. See appointment in dashboard.", serviceName, customerName);
+        String actionUrl = "/dashboard/services";
+        List<User> ownerList = owners != null ? owners : Collections.emptyList();
+        List<User> staffList = staff != null ? staff : Collections.emptyList();
+        for (User u : ownerList) saveNotification(u, "payment", title, message, actionUrl);
+        for (User u : staffList) saveNotification(u, "payment", title, message, actionUrl);
     }
 
     public void notifyShipmentUpdated(Shipment shipment) {
