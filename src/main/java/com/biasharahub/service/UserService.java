@@ -2,6 +2,7 @@ package com.biasharahub.service;
 
 import com.biasharahub.config.TenantContext;
 import com.biasharahub.dto.request.AddAssistantAdminRequest;
+import com.biasharahub.dto.request.AddBusinessOwnerRequest;
 import com.biasharahub.dto.request.AddCourierRequest;
 import com.biasharahub.dto.request.AddOwnerRequest;
 import com.biasharahub.dto.request.AddServiceProviderRequest;
@@ -115,6 +116,70 @@ public class UserService {
         owner.setBusinessId(owner.getUserId());
         owner = userRepository.save(owner);
         mailService.sendWelcomeServiceProvider(owner.getEmail(), owner.getName(), owner.getBusinessName(), tempPassword);
+        return toUserDto(owner);
+    }
+
+    /**
+     * Platform admin onboards a business owner who can sell products, offer services, or both.
+     * Creates owner with business; sends temporary password by email.
+     * Owner logs in and completes verification for their selected business type(s).
+     */
+    @Transactional
+    public UserDto addBusinessOwner(AddBusinessOwnerRequest request) {
+        if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
+            throw new IllegalArgumentException("Email already registered");
+        }
+        if (!request.isSellsProducts() && !request.isOffersServices()) {
+            throw new IllegalArgumentException("At least one of sellsProducts or offersServices must be true");
+        }
+
+        Tenant tenant = resolveCurrentTenant();
+        if (tenant == null) {
+            throw new IllegalStateException("Tenant context required when adding a business owner. Send X-Tenant-ID header.");
+        }
+
+        // Validate product seller fields if applicable
+        String applyingForTier = null;
+        if (request.isSellsProducts()) {
+            String t = request.getApplyingForTier() != null ? request.getApplyingForTier().trim().toLowerCase() : "";
+            if (!"tier1".equals(t) && !"tier2".equals(t) && !"tier3".equals(t)) {
+                throw new IllegalArgumentException("Applying for tier is required for product sellers and must be tier1, tier2, or tier3");
+            }
+            applyingForTier = t;
+
+            String payoutMethod = normalisePayoutMethod(request.getPayoutMethod());
+            if (request.getPayoutDestination() == null || request.getPayoutDestination().isBlank()) {
+                throw new IllegalArgumentException("Payout destination is required for product sellers (e.g. M-Pesa number or bank account)");
+            }
+            tenant.setDefaultPayoutMethod(payoutMethod);
+            tenant.setDefaultPayoutDestination(request.getPayoutDestination().trim());
+            tenantRepository.save(tenant);
+        }
+
+        String tempPassword = generateTemporaryPassword();
+        String businessName = request.getBusinessName() != null ? request.getBusinessName().trim() : null;
+
+        User owner = User.builder()
+                .email(request.getEmail().toLowerCase())
+                .passwordHash(passwordEncoder.encode(tempPassword))
+                .name(request.getName())
+                .role("owner")
+                .twoFactorEnabled(false)
+                .businessName(businessName)
+                .applyingForTier(applyingForTier)
+                .build();
+        owner = userRepository.save(owner);
+        owner.setBusinessId(owner.getUserId());
+        owner = userRepository.save(owner);
+
+        mailService.sendWelcomeBusinessOwner(
+                owner.getEmail(),
+                owner.getName(),
+                owner.getBusinessName(),
+                request.isSellsProducts(),
+                request.isOffersServices(),
+                tempPassword
+        );
         return toUserDto(owner);
     }
 

@@ -1,6 +1,7 @@
 package com.biasharahub.controller;
 
 import com.biasharahub.dto.request.AddAssistantAdminRequest;
+import com.biasharahub.dto.request.AddBusinessOwnerRequest;
 import com.biasharahub.dto.request.AddOwnerRequest;
 import com.biasharahub.dto.request.AddServiceProviderRequest;
 import com.biasharahub.dto.response.UserDto;
@@ -47,6 +48,21 @@ public class AdminController {
     public ResponseEntity<?> addServiceProvider(@Valid @RequestBody AddServiceProviderRequest request) {
         try {
             UserDto owner = userService.addServiceProvider(request);
+            return ResponseEntity.ok(owner);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Onboard a business owner who can sell products, offer services, or both.
+     * They receive a temporary password by email with instructions for their selected business types.
+     */
+    @PostMapping("/business-owners")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+    public ResponseEntity<?> addBusinessOwner(@Valid @RequestBody AddBusinessOwnerRequest request) {
+        try {
+            UserDto owner = userService.addBusinessOwner(request);
             return ResponseEntity.ok(owner);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

@@ -70,10 +70,24 @@ public class ServiceProviderVerificationService {
             deliveryType = d;
         }
 
+        // Location required for PHYSICAL or BOTH delivery type
+        boolean needsLocation = DELIVERY_PHYSICAL.equals(deliveryType) || DELIVERY_BOTH.equals(deliveryType);
+        if (needsLocation) {
+            if (request.getLocationLat() == null || request.getLocationLng() == null) {
+                throw new IllegalArgumentException("Location (latitude and longitude) is required for physical/in-person services. Please select a location on the map.");
+            }
+            if (request.getLocationDescription() == null || request.getLocationDescription().isBlank()) {
+                throw new IllegalArgumentException("Location description is required for physical/in-person services. Please describe your service location (address, landmark, directions).");
+            }
+        }
+
         owner.setServiceProviderStatus(STATUS_PENDING);
         owner.setServiceProviderNotes(null);
         owner.setServiceProviderCategoryId(category.getCategoryId());
         owner.setServiceDeliveryType(deliveryType);
+        owner.setServiceLocationLat(needsLocation ? request.getLocationLat() : null);
+        owner.setServiceLocationLng(needsLocation ? request.getLocationLng() : null);
+        owner.setServiceLocationDescription(needsLocation ? request.getLocationDescription().trim() : null);
         owner.setServiceProviderVerifiedAt(null);
         owner.setServiceProviderVerifiedByUserId(null);
         userRepository.save(owner);
@@ -172,6 +186,9 @@ public class ServiceProviderVerificationService {
                 .serviceProviderNotes(u.getServiceProviderNotes())
                 .serviceProviderCategoryId(u.getServiceProviderCategoryId())
                 .serviceDeliveryType(u.getServiceDeliveryType())
+                .serviceLocationLat(u.getServiceLocationLat())
+                .serviceLocationLng(u.getServiceLocationLng())
+                .serviceLocationDescription(u.getServiceLocationDescription())
                 .serviceProviderVerifiedAt(u.getServiceProviderVerifiedAt())
                 .serviceProviderVerifiedByUserId(u.getServiceProviderVerifiedByUserId())
                 .build();

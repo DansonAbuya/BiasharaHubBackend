@@ -53,5 +53,8 @@
     <include file="db/changelog/changes/046-tenant-service-contracts.xml"/>
     <include file="db/changelog/changes/047-appointment-meeting-link-google-event-id.xml"/>
     <include file="db/changelog/changes/048-service-provider-verification.xml"/>
+    <include file="db/changelog/changes/049-service-provider-location.xml"/>
+    <include file="db/changelog/changes/050-service-appointment-customer-location.xml"/>
+    <include file="db/changelog/changes/051-online-delivery-methods.xml"/>
 
 </databaseChangeLog>

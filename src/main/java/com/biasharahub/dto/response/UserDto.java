@@ -37,6 +37,9 @@ public class UserDto {
     private String serviceProviderNotes;
     private UUID serviceProviderCategoryId;
     private String serviceDeliveryType;
+    private Double serviceLocationLat;
+    private Double serviceLocationLng;
+    private String serviceLocationDescription;
     private java.time.Instant serviceProviderVerifiedAt;
     private UUID serviceProviderVerifiedByUserId;
 }

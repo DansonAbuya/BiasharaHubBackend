@@ -27,6 +27,8 @@ public class ServiceOfferingDto implements Serializable {
     private String deliveryType;
     private String meetingLink;
     private String meetingDetails;
+    /** Comma-separated online delivery methods: VIDEO_CALL, PHONE_CALL, WHATSAPP, LIVE_CHAT, EMAIL, SCREEN_SHARE, FILE_DELIVERY, RECORDED_CONTENT, SOCIAL_MEDIA */
+    private String onlineDeliveryMethods;
     /** BEFORE_BOOKING, AFTER_SERVICE, AS_PER_CONTRACT */
     private String paymentTiming;
     private Integer durationMinutes;
