@@ -171,11 +171,23 @@ public class WhatsAppNotificationService {
         String serviceName = appointment.getService().getName() != null ? appointment.getService().getName() : "your service";
         String dateTime = appointment.getRequestedDate() != null ? appointment.getRequestedDate().toString() : "";
         if (appointment.getRequestedTime() != null) dateTime += " at " + appointment.getRequestedTime();
-        String body = String.format(
-                "BiasharaHub: New booking for \"%s\" from %s on %s. Log in to confirm.",
-                serviceName, customerName, dateTime);
+
+        StringBuilder body = new StringBuilder();
+        body.append("BiasharaHub: New booking for \"").append(serviceName).append("\" from ").append(customerName);
+        body.append(" on ").append(dateTime).append(".");
+
+        // Include customer location for physical services
+        if (appointment.getCustomerLocationDescription() != null && !appointment.getCustomerLocationDescription().isBlank()) {
+            body.append("\n📍 Customer location: ").append(appointment.getCustomerLocationDescription());
+        } else if (appointment.getCustomerLocationLat() != null && appointment.getCustomerLocationLng() != null) {
+            body.append("\n📍 Customer location: https://www.google.com/maps?q=")
+                    .append(appointment.getCustomerLocationLat()).append(",").append(appointment.getCustomerLocationLng());
+        }
+
+        body.append("\nLog in to confirm.");
+
         for (User u : getSellerUsers(appointment.getService().getBusinessId())) {
-            if (u.getPhone() != null && !u.getPhone().isBlank()) client.sendMessage(u.getPhone(), body);
+            if (u.getPhone() != null && !u.getPhone().isBlank()) client.sendMessage(u.getPhone(), body.toString());
         }
     }
 

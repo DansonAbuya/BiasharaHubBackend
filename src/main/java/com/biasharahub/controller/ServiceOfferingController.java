@@ -9,6 +9,7 @@ import com.biasharahub.dto.response.PaymentInitiateResponse;
 import com.biasharahub.dto.response.ServiceAppointmentDto;
 import com.biasharahub.dto.response.ServiceCategoryDto;
 import com.biasharahub.dto.response.ServiceOfferingDto;
+import com.biasharahub.dto.response.ServiceProviderLocationDto;
 import com.biasharahub.entity.ServiceAppointment;
 import com.biasharahub.entity.ServiceBookingPayment;
 import com.biasharahub.entity.ServiceCategory;
@@ -98,6 +99,79 @@ public class ServiceOfferingController {
                         .name(c.getName())
                         .displayOrder(c.getDisplayOrder())
                         .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * List verified service providers with their location info.
+     * Public endpoint for map-based search. Only shows providers who offer PHYSICAL or BOTH delivery types
+     * and have location set. Optionally filter by category, delivery type, or search query.
+     */
+    @GetMapping("/providers")
+    public List<ServiceProviderLocationDto> listServiceProviders(
+            @RequestParam(required = false) UUID categoryId,
+            @RequestParam(required = false) String deliveryType,
+            @RequestParam(required = false) String search) {
+        List<User> verifiedProviders = userRepository
+                .findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
+
+        return verifiedProviders.stream()
+                .filter(u -> {
+                    // Only include providers with PHYSICAL or BOTH delivery type who have location set
+                    String dt = u.getServiceDeliveryType();
+                    if (dt == null) return false;
+                    if (!"PHYSICAL".equalsIgnoreCase(dt) && !"BOTH".equalsIgnoreCase(dt)) return false;
+                    return u.getServiceLocationLat() != null && u.getServiceLocationLng() != null;
+                })
+                .filter(u -> {
+                    // Filter by delivery type if specified
+                    if (deliveryType != null && !deliveryType.isBlank()) {
+                        return deliveryType.equalsIgnoreCase(u.getServiceDeliveryType());
+                    }
+                    return true;
+                })
+                .filter(u -> {
+                    // Filter by category if specified
+                    if (categoryId != null) {
+                        return categoryId.equals(u.getServiceProviderCategoryId());
+                    }
+                    return true;
+                })
+                .filter(u -> {
+                    // Filter by search query (name, business name, location description)
+                    if (search != null && !search.isBlank()) {
+                        String q = search.toLowerCase();
+                        String name = u.getName() != null ? u.getName().toLowerCase() : "";
+                        String businessName = u.getBusinessName() != null ? u.getBusinessName().toLowerCase() : "";
+                        String locDesc = u.getServiceLocationDescription() != null ? u.getServiceLocationDescription().toLowerCase() : "";
+                        return name.contains(q) || businessName.contains(q) || locDesc.contains(q);
+                    }
+                    return true;
+                })
+                .map(u -> {
+                    String categoryName = null;
+                    if (u.getServiceProviderCategoryId() != null) {
+                        categoryName = serviceCategoryRepository.findById(u.getServiceProviderCategoryId())
+                                .map(ServiceCategory::getName)
+                                .orElse(null);
+                    }
+                    int serviceCount = serviceOfferingRepository.countByBusinessIdAndIsActive(u.getBusinessId(), true);
+                    return ServiceProviderLocationDto.builder()
+                            .ownerId(u.getUserId())
+                            .businessId(u.getBusinessId())
+                            .businessName(u.getBusinessName())
+                            .name(u.getName())
+                            .email(u.getEmail())
+                            .phone(u.getPhone())
+                            .serviceDeliveryType(u.getServiceDeliveryType())
+                            .locationLat(u.getServiceLocationLat())
+                            .locationLng(u.getServiceLocationLng())
+                            .locationDescription(u.getServiceLocationDescription())
+                            .serviceCategoryId(u.getServiceProviderCategoryId())
+                            .serviceCategoryName(categoryName)
+                            .serviceCount(serviceCount)
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 
@@ -202,6 +276,7 @@ public class ServiceOfferingController {
                 .deliveryType(request.getDeliveryType() != null ? request.getDeliveryType() : "PHYSICAL")
                 .meetingLink(request.getMeetingLink())
                 .meetingDetails(request.getMeetingDetails())
+                .onlineDeliveryMethods(request.getOnlineDeliveryMethods())
                 .paymentTiming(request.getPaymentTiming() != null && !request.getPaymentTiming().isBlank() ? request.getPaymentTiming() : "BEFORE_BOOKING")
                 .durationMinutes(request.getDurationMinutes())
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
@@ -233,6 +308,7 @@ public class ServiceOfferingController {
                     if (request.getDeliveryType() != null) s.setDeliveryType(request.getDeliveryType());
                     if (request.getMeetingLink() != null) s.setMeetingLink(request.getMeetingLink());
                     if (request.getMeetingDetails() != null) s.setMeetingDetails(request.getMeetingDetails());
+                    if (request.getOnlineDeliveryMethods() != null) s.setOnlineDeliveryMethods(request.getOnlineDeliveryMethods());
                     if (request.getPaymentTiming() != null) s.setPaymentTiming(request.getPaymentTiming());
                     if (request.getDurationMinutes() != null) s.setDurationMinutes(request.getDurationMinutes());
                     if (request.getIsActive() != null) s.setIsActive(request.getIsActive());
@@ -569,6 +645,7 @@ public class ServiceOfferingController {
                 .deliveryType(s.getDeliveryType())
                 .meetingLink(s.getMeetingLink())
                 .meetingDetails(s.getMeetingDetails())
+                .onlineDeliveryMethods(s.getOnlineDeliveryMethods())
                 .paymentTiming(s.getPaymentTiming() != null ? s.getPaymentTiming() : "BEFORE_BOOKING")
                 .durationMinutes(s.getDurationMinutes())
                 .isActive(s.getIsActive())

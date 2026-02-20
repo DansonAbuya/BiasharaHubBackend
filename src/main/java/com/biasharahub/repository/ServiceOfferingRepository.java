@@ -51,4 +51,6 @@ public interface ServiceOfferingRepository extends JpaRepository<ServiceOffering
     Optional<ServiceOffering> findByServiceIdAndBusinessId(UUID serviceId, UUID businessId);
 
     boolean existsByServiceIdAndBusinessId(UUID serviceId, UUID businessId);
+
+    int countByBusinessIdAndIsActive(UUID businessId, Boolean isActive);
 }

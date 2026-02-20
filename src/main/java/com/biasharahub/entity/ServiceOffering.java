@@ -62,6 +62,14 @@ public class ServiceOffering {
     private String meetingDetails;
 
     /**
+     * For VIRTUAL/online services: comma-separated delivery methods.
+     * Possible values: VIDEO_CALL, PHONE_CALL, WHATSAPP, LIVE_CHAT, EMAIL, 
+     * SCREEN_SHARE, FILE_DELIVERY, RECORDED_CONTENT, SOCIAL_MEDIA
+     */
+    @Column(name = "online_delivery_methods", columnDefinition = "TEXT")
+    private String onlineDeliveryMethods;
+
+    /**
      * When payment is taken: BEFORE_BOOKING (pay to book), AFTER_SERVICE (pay after service), AS_PER_CONTRACT (per signed contract).
      */
     @Column(name = "payment_timing", length = 30)

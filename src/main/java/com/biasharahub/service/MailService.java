@@ -136,6 +136,61 @@ public class MailService {
     }
 
     /**
+     * Welcome email for a business owner who can sell products, offer services, or both (added by admin).
+     * Includes business name, temporary password, and instructions based on selected business types.
+     */
+    public void sendWelcomeBusinessOwner(@NonNull String toEmail, @NonNull String name, String businessName,
+                                          boolean sellsProducts, boolean offersServices, @NonNull String temporaryPassword) {
+        String businessLine = (businessName != null && !businessName.isBlank())
+                ? "Your business \"" + businessName + "\" has been set up on BiasharaHub."
+                : "You have been added as a business owner on BiasharaHub.";
+
+        StringBuilder instructions = new StringBuilder();
+        instructions.append("After logging in, go to Verification in your dashboard:\n");
+
+        if (sellsProducts && offersServices) {
+            instructions.append("""
+                    
+                    To sell products:
+                    • Go to Verification → Sell products and upload the required documents for your tier (ID, business registration, KRA PIN depending on tier).
+                    • Once verified, add your products in Dashboard → Products.
+                    
+                    To offer services:
+                    • Go to Verification → Offer services, choose your service category, how you deliver (online, in-person, or both), and upload verification and qualification/expertise documents.
+                    • Add your service offerings in Dashboard → Services (name, price, description).
+                    
+                    An admin will verify your documents for each type. Once approved, your products and/or services will be listed on the platform.""");
+        } else if (sellsProducts) {
+            instructions.append("""
+                    
+                    • Go to Verification → Sell products and upload the required documents for your tier (ID, business registration, KRA PIN depending on tier).
+                    • Once an admin verifies and approves your business, add your products in Dashboard → Products.
+                    • Your shop will be visible to customers after verification.""");
+        } else if (offersServices) {
+            instructions.append("""
+                    
+                    • Go to Verification → Offer services, choose your service category, how you deliver (online, in-person, or both), and upload verification and qualification/expertise documents.
+                    • Add your service offerings in Dashboard → Services (name, price, description).
+                    • An admin will verify your documents and approve your account. Once approved, your services will be listed for customers.""");
+        }
+
+        String text = """
+                Hi %s,
+
+                %s
+
+                Your temporary password is: %s
+
+                %s
+
+                Please change your password after first login and enable two-factor authentication in Settings.
+
+                If you did not expect this email, please contact support.
+                """.formatted(name, businessLine, temporaryPassword, instructions.toString());
+        send(toEmail, "Welcome to BiasharaHub – Business account", text);
+    }
+
+    /**
      * Welcome email for a new staff member (added by owner). Includes business name and temporary password.
      */
     public void sendWelcomeStaff(@NonNull String toEmail, @NonNull String name, String businessName, @NonNull String temporaryPassword) {

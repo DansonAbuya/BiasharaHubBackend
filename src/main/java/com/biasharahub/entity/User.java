@@ -145,6 +145,18 @@ public class User {
     @Column(name = "service_delivery_type", length = 32)
     private String serviceDeliveryType;
 
+    /** Service location latitude (required for PHYSICAL or BOTH delivery type). */
+    @Column(name = "service_location_lat")
+    private Double serviceLocationLat;
+
+    /** Service location longitude (required for PHYSICAL or BOTH delivery type). */
+    @Column(name = "service_location_lng")
+    private Double serviceLocationLng;
+
+    /** Description of the service location (address, landmark, directions). */
+    @Column(name = "service_location_description", columnDefinition = "TEXT")
+    private String serviceLocationDescription;
+
     @Column(name = "service_provider_verified_at")
     private Instant serviceProviderVerifiedAt;
 
