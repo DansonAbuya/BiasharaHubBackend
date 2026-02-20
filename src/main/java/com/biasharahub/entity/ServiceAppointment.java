@@ -80,6 +80,18 @@ public class ServiceAppointment {
     @Column(name = "escrow_status", length = 20)
     private String escrowStatus;
 
+    /** Customer location latitude (for physical services where customer specifies service location). */
+    @Column(name = "customer_location_lat")
+    private Double customerLocationLat;
+
+    /** Customer location longitude (for physical services). */
+    @Column(name = "customer_location_lng")
+    private Double customerLocationLng;
+
+    /** Customer's location description/address (for physical services). */
+    @Column(name = "customer_location_description", columnDefinition = "TEXT")
+    private String customerLocationDescription;
+
     @Column(name = "created_at")
     private Instant createdAt;
 

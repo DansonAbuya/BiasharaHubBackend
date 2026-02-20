@@ -37,6 +37,11 @@ public class CreateServiceOfferingRequest {
     private String meetingLink;
     /** For VIRTUAL: extra instructions. */
     private String meetingDetails;
+    /**
+     * For VIRTUAL services: comma-separated delivery methods.
+     * VIDEO_CALL, PHONE_CALL, WHATSAPP, LIVE_CHAT, EMAIL, SCREEN_SHARE, FILE_DELIVERY, RECORDED_CONTENT, SOCIAL_MEDIA
+     */
+    private String onlineDeliveryMethods;
     /** BEFORE_BOOKING, AFTER_SERVICE, or AS_PER_CONTRACT. */
     @Pattern(regexp = "BEFORE_BOOKING|AFTER_SERVICE|AS_PER_CONTRACT", message = "Invalid payment timing")
     private String paymentTiming;

@@ -22,14 +22,17 @@ public class WhatsAppWebhookController {
 
     /**
      * Twilio sends POST with application/x-www-form-urlencoded: From, Body, To, etc.
+     * Location shares include Latitude and Longitude parameters.
      */
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> handleIncoming(
             @RequestParam(value = "From", required = false) String from,
-            @RequestParam(value = "Body", required = false) String body) {
+            @RequestParam(value = "Body", required = false) String body,
+            @RequestParam(value = "Latitude", required = false) String latitude,
+            @RequestParam(value = "Longitude", required = false) String longitude) {
         try {
             if (from != null && !from.isBlank()) {
-                chatbotService.handleIncomingMessage(from, body != null ? body : "");
+                chatbotService.handleIncomingMessage(from, body != null ? body : "", latitude, longitude);
             }
         } catch (Exception e) {
             log.warn("WhatsApp webhook error: {}", e.getMessage());
