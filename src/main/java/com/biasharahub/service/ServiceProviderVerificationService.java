@@ -123,6 +123,30 @@ public class ServiceProviderVerificationService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Upload a single verification/qualification document for a service provider.
+     * This is used when files are uploaded directly (via R2) before the apply form is submitted.
+     */
+    @Transactional
+    public ServiceProviderDocumentDto uploadDocument(AuthenticatedUser currentUser, String documentType, String fileUrl) {
+        User owner = userRepository.findById(currentUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (!"owner".equalsIgnoreCase(owner.getRole())) {
+            throw new IllegalArgumentException("Only business owners can upload service provider documents");
+        }
+        if (fileUrl == null || fileUrl.isBlank()) {
+            throw new IllegalArgumentException("File URL is required");
+        }
+        String docType = documentType != null && !documentType.isBlank() ? documentType : DOC_TYPE_QUALIFICATION;
+        ServiceProviderDocument doc = ServiceProviderDocument.builder()
+                .user(owner)
+                .documentType(docType)
+                .fileUrl(fileUrl)
+                .build();
+        doc = documentRepository.save(doc);
+        return toDocDto(doc);
+    }
+
     /** Admin: list owners pending service provider verification. */
     public List<UserDto> listPendingServiceProviders() {
         return userRepository.findByRoleIgnoreCaseAndServiceProviderStatusOrderByCreatedAtAsc("owner", STATUS_PENDING)
