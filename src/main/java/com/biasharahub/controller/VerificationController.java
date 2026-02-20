@@ -144,6 +144,40 @@ public class VerificationController {
 
     // ---------- Service provider verification (separate journey from product seller) ----------
 
+    /**
+     * Upload a service provider verification document (image or PDF) using R2 storage.
+     * This is for service provider verification documents (ID, qualifications), not product seller documents.
+     */
+    @PostMapping(value = "/service-provider/documents/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<?> uploadServiceProviderDocumentFile(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam("documentType") String documentType,
+            @RequestParam("file") MultipartFile file) {
+        if (r2StorageService.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", "File upload is not configured (R2 disabled). Please paste a document URL instead."));
+        }
+        try {
+            String contentType = file.getContentType();
+            String ct = contentType != null ? contentType.toLowerCase() : "";
+            boolean isImage = ct.startsWith("image/");
+            String url;
+            if (isImage) {
+                url = r2StorageService.get().uploadProductImage(file);
+            } else {
+                url = r2StorageService.get().uploadVerificationDocument(file);
+            }
+            ServiceProviderDocumentDto doc = serviceProviderVerificationService.uploadDocument(user, documentType, url);
+            return ResponseEntity.ok(doc);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Upload failed: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/service-provider/apply")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<UserDto> applyServiceProvider(
