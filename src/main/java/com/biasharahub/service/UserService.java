@@ -339,6 +339,9 @@ public class UserService {
                 .verificationNotes(user.getVerificationNotes())
                 .sellerTier(user.getSellerTier())
                 .applyingForTier(user.getApplyingForTier())
+                // Service provider fields
+                .serviceProviderStatus(user.getServiceProviderStatus())
+                .serviceDeliveryType(user.getServiceDeliveryType())
                 .build();
     }
 }
