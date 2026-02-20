@@ -49,6 +49,9 @@ public class UserController {
                         .verificationStatus(u.getVerificationStatus())
                         .sellerTier(u.getSellerTier())
                         .applyingForTier(u.getApplyingForTier())
+                        // Service provider fields
+                        .serviceProviderStatus(u.getServiceProviderStatus())
+                        .serviceDeliveryType(u.getServiceDeliveryType())
                         .build()))
                 .orElse(ResponseEntity.status(401).build());
     }
