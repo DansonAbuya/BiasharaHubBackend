@@ -111,6 +111,7 @@ public class UserService {
                 .role("owner")
                 .twoFactorEnabled(false)
                 .businessName(businessName)
+                .serviceProviderStatus("pending")
                 .build();
         owner = userRepository.save(owner);
         owner.setBusinessId(owner.getUserId());
