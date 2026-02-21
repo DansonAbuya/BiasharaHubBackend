@@ -7,6 +7,7 @@ import com.biasharahub.dto.request.AddServiceProviderRequest;
 import com.biasharahub.dto.response.UserDto;
 import com.biasharahub.service.UserService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -28,8 +29,26 @@ public class AdminController {
 
     private final UserService userService;
 
+    @Value("${app.oauth2.backend-base-url:http://localhost:5050/api}")
+    private String apiBaseUrl;
+
     public AdminController(UserService userService) {
         this.userService = userService;
+    }
+
+    /**
+     * Returns URLs for API documentation (Swagger UI and OpenAPI spec).
+     * Admin screen can use these to open Swagger in a new tab or fetch the spec to render docs.
+     * Only SUPER_ADMIN and ASSISTANT_ADMIN can access Swagger and this endpoint.
+     */
+    @GetMapping("/api-docs-info")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+    public ResponseEntity<Map<String, String>> getApiDocsInfo() {
+        String base = apiBaseUrl.endsWith("/") ? apiBaseUrl.substring(0, apiBaseUrl.length() - 1) : apiBaseUrl;
+        return ResponseEntity.ok(Map.of(
+                "swaggerUiUrl", base + "/swagger-ui.html",
+                "openApiSpecUrl", base + "/v3/api-docs"
+        ));
     }
 
     @PostMapping("/owners")

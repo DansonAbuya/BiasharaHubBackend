@@ -68,6 +68,10 @@ public class SecurityConfig {
                         .requestMatchers("/auth/2fa/oauth/authorize", "/auth/oauth2/callback",
                                 "/api/auth/2fa/oauth/authorize", "/api/auth/oauth2/callback").permitAll()
                         .requestMatchers("/auth/2fa/**", "/api/auth/2fa/**", "/auth/change-password", "/api/auth/change-password").authenticated()
+                        // Swagger / OpenAPI docs: admin only (so admin screen can link or fetch spec)
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**",
+                                "/api/swagger-ui/**", "/api/v3/api-docs", "/api/v3/api-docs/**").hasAnyRole("SUPER_ADMIN", "ASSISTANT_ADMIN")
+                        .requestMatchers("/admin/api-docs-info", "/api/admin/api-docs-info").hasAnyRole("SUPER_ADMIN", "ASSISTANT_ADMIN")
                         // Public storefront (home/marketplace): list shops, categories, products and single product — no auth
                         .requestMatchers(HttpMethod.GET, "/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/services/**").permitAll()
