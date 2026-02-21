@@ -357,8 +357,9 @@ public class WhatsAppChatbotService {
         boolean isServiceProvider = isOwner && businessId != null && "verified".equalsIgnoreCase(user.getServiceProviderStatus());
 
         // ===== OWNER (SELLER / PROVIDER) COMMANDS =====
+        // Sellers and providers only see/act on their own business (businessId); all methods filter by owner.getBusinessId().
         if (isOwner) {
-            // Seller: orders to my shop
+            // Seller: orders to my shop (own business only)
             if ((isProductSeller) && (lower.equals("orders") || lower.equals("shop orders") || lower.equals("my shop orders"))) {
                 return replySellerOrders(user, phone);
             }
@@ -391,8 +392,13 @@ public class WhatsAppChatbotService {
             if (isServiceProvider && (lower.equals("my services") || lower.equals("seller services"))) {
                 return replyMyServicesList(user);
             }
+            // Sellers and providers only get business-related commands; no customer flows (shops, order, pay, book, etc.)
+            if (isProductSeller || isServiceProvider) {
+                return buildMenu(user);
+            }
         }
 
+        // ===== CUSTOMER-ONLY FLOWS (owners/sellers/providers do not get these) =====
         ChatStage stage = stageByPhone.getOrDefault(phone, ChatStage.MAIN_MENU);
 
         // If we are on the shops list screen, numeric replies pick a shop
@@ -592,42 +598,49 @@ public class WhatsAppChatbotService {
     private String buildMenu(User user) {
         StringBuilder sb = new StringBuilder();
         sb.append("BiasharaHub 24/7 Assistant\n\n");
-        sb.append("*PRODUCTS (shops)*\n");
-        sb.append("1. Browse shops – reply SHOPS\n");
-        sb.append("2. Check stock – reply STOCK or STOCK <shop>\n");
-        sb.append("3. My orders – reply ORDER\n");
-        sb.append("4. Pay for order – reply PAY\n");
-        sb.append("5. Delivery status – reply DELIVERY\n\n");
-        sb.append("*SERVICES (expertise, skills, talents)*\n");
-        sb.append("6. Service providers – reply SERVICES\n");
-        sb.append("   • Verified professionals (online or in-person)\n");
-        sb.append("   • Reply LOCATION <number> to see provider address/map before booking\n");
-        sb.append("   • For in-person: share your location or type BOOK 1 at <your address>\n");
-        sb.append("7. My bookings – reply MY BOOKINGS\n");
-        sb.append("8. Pay for booking – reply PAY SERVICE\n\n");
-        if (user != null && "owner".equalsIgnoreCase(user.getRole())) {
-            UUID businessId = user.getBusinessId();
-            boolean isProductSeller = businessId != null && ("verified".equalsIgnoreCase(user.getVerificationStatus()) || user.getSellerTier() != null);
-            boolean isServiceProvider = businessId != null && "verified".equalsIgnoreCase(user.getServiceProviderStatus());
+        boolean isOwner = user != null && "owner".equalsIgnoreCase(user.getRole());
+        UUID businessId = user != null ? user.getBusinessId() : null;
+        boolean isProductSeller = isOwner && businessId != null && ("verified".equalsIgnoreCase(user.getVerificationStatus()) || user.getSellerTier() != null);
+        boolean isServiceProvider = isOwner && businessId != null && "verified".equalsIgnoreCase(user.getServiceProviderStatus());
+        boolean ownerOnlyMenu = isProductSeller || isServiceProvider;
+
+        if (ownerOnlyMenu) {
+            // Sellers and providers see only their business options; no customer (shops, order, book) options
             if (isProductSeller) {
                 sb.append("*YOUR SHOP*\n");
-                sb.append("9. Shop orders – reply ORDERS\n");
-                sb.append("10. Confirm order – CONFIRM <n> (e.g. CONFIRM 1)\n");
-                sb.append("11. Mark shipped – SHIP <n> (e.g. SHIP 1)\n");
-                sb.append("12. My products – reply PRODUCTS\n");
-                sb.append("13. Low stock – reply LOW STOCK\n\n");
+                sb.append("1. Shop orders – reply ORDERS\n");
+                sb.append("2. Confirm order – CONFIRM <n> (e.g. CONFIRM 1)\n");
+                sb.append("3. Mark shipped – SHIP <n> (e.g. SHIP 1)\n");
+                sb.append("4. My products – reply PRODUCTS\n");
+                sb.append("5. Low stock – reply LOW STOCK\n\n");
             }
             if (isServiceProvider) {
                 sb.append("*YOUR SERVICES*\n");
-                sb.append("14. Appointments – reply APPOINTMENTS\n");
-                sb.append("15. Confirm/Cancel – CONFIRM APT <n> / CANCEL APT <n>\n");
-                sb.append("16. My services – reply MY SERVICES\n\n");
+                sb.append("6. Appointments – reply APPOINTMENTS\n");
+                sb.append("7. Confirm/Cancel – CONFIRM APT <n> / CANCEL APT <n>\n");
+                sb.append("8. My services – reply MY SERVICES\n\n");
             }
-        }
-        if (user == null) {
-            sb.append("Register at ").append(storefrontUrl).append(" to order products or book services.");
+            sb.append("You can only manage your own business here. Reply MENU anytime.");
         } else {
-            sb.append("Browse: ").append(storefrontUrl).append(" (shops & services). Reply MENU anytime.");
+            // Customer menu (or unlinked user)
+            sb.append("*PRODUCTS (shops)*\n");
+            sb.append("1. Browse shops – reply SHOPS\n");
+            sb.append("2. Check stock – reply STOCK or STOCK <shop>\n");
+            sb.append("3. My orders – reply ORDER\n");
+            sb.append("4. Pay for order – reply PAY\n");
+            sb.append("5. Delivery status – reply DELIVERY\n\n");
+            sb.append("*SERVICES (expertise, skills, talents)*\n");
+            sb.append("6. Service providers – reply SERVICES\n");
+            sb.append("   • Verified professionals (online or in-person)\n");
+            sb.append("   • Reply LOCATION <number> to see provider address/map before booking\n");
+            sb.append("   • For in-person: share your location or type BOOK 1 at <your address>\n");
+            sb.append("7. My bookings – reply MY BOOKINGS\n");
+            sb.append("8. Pay for booking – reply PAY SERVICE\n\n");
+            if (user == null) {
+                sb.append("Register at ").append(storefrontUrl).append(" to order products or book services.");
+            } else {
+                sb.append("Browse: ").append(storefrontUrl).append(" (shops & services). Reply MENU anytime.");
+            }
         }
         return sb.toString();
     }
