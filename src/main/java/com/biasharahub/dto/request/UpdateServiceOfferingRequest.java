@@ -33,5 +33,12 @@ public class UpdateServiceOfferingRequest {
 
     private Integer durationMinutes;
 
+    /** Main image URL to showcase this service. */
+    private String imageUrl;
+    /** Optional video URL to demonstrate this service (YouTube, Vimeo, or direct link). */
+    private String videoUrl;
+    /** Comma-separated list of additional image URLs for this service. */
+    private String galleryUrls;
+
     private Boolean isActive;
 }

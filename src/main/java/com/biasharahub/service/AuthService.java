@@ -188,6 +188,9 @@ public class AuthService {
                 .verificationStatus(user.getVerificationStatus())
                 .sellerTier(user.getSellerTier())
                 .applyingForTier(user.getApplyingForTier())
+                // Service provider fields
+                .serviceProviderStatus(user.getServiceProviderStatus())
+                .serviceDeliveryType(user.getServiceDeliveryType())
                 .build();
     }
 

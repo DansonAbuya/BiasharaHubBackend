@@ -42,6 +42,7 @@ public class ServiceProviderVerificationService {
     private final UserRepository userRepository;
     private final ServiceCategoryRepository serviceCategoryRepository;
     private final ServiceProviderDocumentRepository documentRepository;
+    private final MailService mailService;
 
     /** Owner applies to become a service provider. Resets status to pending and stores category, delivery type, and docs. */
     @Transactional
@@ -123,6 +124,30 @@ public class ServiceProviderVerificationService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Upload a single verification/qualification document for a service provider.
+     * This is used when files are uploaded directly (via R2) before the apply form is submitted.
+     */
+    @Transactional
+    public ServiceProviderDocumentDto uploadDocument(AuthenticatedUser currentUser, String documentType, String fileUrl) {
+        User owner = userRepository.findById(currentUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (!"owner".equalsIgnoreCase(owner.getRole())) {
+            throw new IllegalArgumentException("Only business owners can upload service provider documents");
+        }
+        if (fileUrl == null || fileUrl.isBlank()) {
+            throw new IllegalArgumentException("File URL is required");
+        }
+        String docType = documentType != null && !documentType.isBlank() ? documentType : DOC_TYPE_QUALIFICATION;
+        ServiceProviderDocument doc = ServiceProviderDocument.builder()
+                .user(owner)
+                .documentType(docType)
+                .fileUrl(fileUrl)
+                .build();
+        doc = documentRepository.save(doc);
+        return toDocDto(doc);
+    }
+
     /** Admin: list owners pending service provider verification. */
     public List<UserDto> listPendingServiceProviders() {
         return userRepository.findByRoleIgnoreCaseAndServiceProviderStatusOrderByCreatedAtAsc("owner", STATUS_PENDING)
@@ -153,6 +178,14 @@ public class ServiceProviderVerificationService {
         owner.setServiceProviderVerifiedByUserId(admin.userId());
         owner.setServiceProviderNotes(notes);
         owner = userRepository.save(owner);
+
+        // Send email notification
+        if (STATUS_VERIFIED.equalsIgnoreCase(status)) {
+            mailService.sendServiceProviderApproved(owner.getEmail(), owner.getName(), owner.getBusinessName());
+        } else if (STATUS_REJECTED.equalsIgnoreCase(status)) {
+            mailService.sendServiceProviderRejected(owner.getEmail(), owner.getName(), owner.getBusinessName(), notes);
+        }
+
         return toUserDto(owner);
     }
 

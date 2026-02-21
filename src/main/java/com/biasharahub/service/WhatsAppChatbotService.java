@@ -23,13 +23,12 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * WhatsApp Business AI Chatbot: 24/7 assistant per the flow diagram.
- * - Shops: list shops (stores), search by shop name or number.
- * - Inventory check: "Is it in stock?" / "STOCK" / "STOCK &lt;shop&gt;" → Checks product stock (by shop when given).
- * - Order: "Order Confirmed!" / creates order or lists orders.
- * - Payment: "Please Pay Now." → Sends M-Pesa payment request.
- * - Shipment: "Delivery Method Set." / status updates.
- * - Customer updates: Order Shipped, Out for Delivery, Delivered! (sent by WhatsAppNotificationService).
+ * WhatsApp Business AI Chatbot: 24/7 assistant for products and services.
+ * - Products: list shops, STOCK / STOCK &lt;shop&gt;, ORDER, PAY, DELIVERY status.
+ * - Services: list verified service providers (expertise, skills, talents); LOCATION &lt;number&gt; for address/map;
+ *   BOOK &lt;number&gt; with optional date/time and location (share location or "BOOK 1 at &lt;address&gt;");
+ *   BOOKINGS, PAY SERVICE for M-Pesa. Online services: video/phone/WhatsApp/email etc. per service.
+ * - Customer updates: Order Shipped, Out for Delivery, Delivered (WhatsAppNotificationService).
  */
 @Service
 @RequiredArgsConstructor
@@ -95,6 +94,10 @@ public class WhatsAppChatbotService {
     private final ConcurrentHashMap<String, List<UUID>> lastBookingIdsByPhone = new ConcurrentHashMap<>();
     /** Pending customer location for next booking. Stores [lat, lng, description]. */
     private final ConcurrentHashMap<String, CustomerLocation> pendingLocationByPhone = new ConcurrentHashMap<>();
+    /** Last order IDs shown to seller (for CONFIRM 1, SHIP 1). */
+    private final ConcurrentHashMap<String, List<UUID>> lastSellerOrderIdsByPhone = new ConcurrentHashMap<>();
+    /** Last appointment IDs shown to provider (for CONFIRM APT 1, CANCEL APT 1). */
+    private final ConcurrentHashMap<String, List<UUID>> lastProviderAppointmentIdsByPhone = new ConcurrentHashMap<>();
 
     private static final Pattern SIX_DIGITS = Pattern.compile("^\\d{6}$");
     private static final Pattern EMAIL_LIKE = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
@@ -138,19 +141,18 @@ public class WhatsAppChatbotService {
             }
         }
 
-        User customer = findCustomerByPhone(phone);
+        User user = findUserByPhone(phone);
         String message = (body != null) ? body.trim() : "";
 
         // If number not found, run link flow (email → code → link, or register then link)
-        if (customer == null) {
+        if (user == null) {
             String linkReply = handleUnknownPhoneLinkFlow(phone, message);
             if (linkReply != null) {
                 whatsAppClient.sendMessage(phone, linkReply);
                 return;
             }
-            // Fall through: still no customer (e.g. first message) – will send generic welcome below
         }
-        String reply = buildReply(customer, phone, message);
+        String reply = buildReply(user, phone, message);
         if (reply != null && !reply.isBlank()) {
             whatsAppClient.sendMessage(phone, reply);
         }
@@ -169,19 +171,15 @@ public class WhatsAppChatbotService {
         if (stage == ChatStage.SERVICE_LIST) {
             List<UUID> serviceIds = lastServiceIdsByPhone.get(phone);
             if (serviceIds != null && !serviceIds.isEmpty()) {
-                return "📍 Location received! Your location will be used for your next booking.\n\n"
-                        + "Reply BOOK <number> to book a service at this location (e.g. BOOK 1).\n"
-                        + "Or add a description: BOOK 1 at " + String.format("%.4f, %.4f", lat, lng);
+                return "📍 Location received! We'll use it for your in-person booking.\n\n"
+                        + "Reply BOOK <number> to confirm (e.g. BOOK 1).\n"
+                        + "Reply SERVICES to pick another provider, MENU for main menu.";
             }
         }
 
-        return "📍 Location received! Your location has been saved for your next physical service booking.\n\n"
-                + "To book a service:\n"
-                + "1. Reply SERVICES to browse service providers\n"
-                + "2. Pick a provider to see their services\n"
-                + "3. Reply BOOK <number> to book\n\n"
-                + "Your shared location will automatically be used for physical services.\n"
-                + "Reply MENU for main menu.";
+        return "📍 Location saved for your next in-person service booking.\n\n"
+                + "Next: Reply SERVICES → pick a provider → see their services → BOOK <number>.\n"
+                + "Your location will be sent to the provider. Reply MENU for main menu.";
     }
 
     private String normalizePhoneFromTwilio(String from) {
@@ -200,22 +198,29 @@ public class WhatsAppChatbotService {
         return s;
     }
 
+    /** Find customer by phone (for backward compatibility in reply methods that expect customer). */
     private User findCustomerByPhone(String phone) {
+        User u = findUserByPhone(phone);
+        return (u != null && "customer".equalsIgnoreCase(u.getRole())) ? u : null;
+    }
+
+    /** Find user by phone: owner first (so sellers/providers can use WhatsApp), then customer. */
+    private User findUserByPhone(String phone) {
         if (phone == null || phone.isBlank()) return null;
         String digits = phone.replaceAll("\\D", "");
-        // Try E.164 (+254...)
-        Optional<User> u = userRepository.findFirstByRoleIgnoreCaseAndPhone("customer", phone);
-        if (u.isPresent()) return u.get();
-        // Try 0...
         String withZero = digits.length() >= 9 ? "0" + digits.substring(digits.length() - 9) : null;
-        if (withZero != null) {
-            u = userRepository.findFirstByRoleIgnoreCaseAndPhone("customer", withZero);
+        String noPlus = digits.startsWith("254") ? digits : "254" + (digits.length() >= 9 ? digits.substring(digits.length() - 9) : digits);
+        for (String role : new String[] { "owner", "customer" }) {
+            Optional<User> u = userRepository.findFirstByRoleIgnoreCaseAndPhone(role, phone);
+            if (u.isPresent()) return u.get();
+            if (withZero != null) {
+                u = userRepository.findFirstByRoleIgnoreCaseAndPhone(role, withZero);
+                if (u.isPresent()) return u.get();
+            }
+            u = userRepository.findFirstByRoleIgnoreCaseAndPhone(role, noPlus);
             if (u.isPresent()) return u.get();
         }
-        // Try without +
-        String noPlus = digits.startsWith("254") ? digits : "254" + (digits.length() >= 9 ? digits.substring(digits.length() - 9) : digits);
-        u = userRepository.findFirstByRoleIgnoreCaseAndPhone("customer", noPlus);
-        return u.orElse(null);
+        return null;
     }
 
     /**
@@ -250,7 +255,7 @@ public class WhatsAppChatbotService {
             }
             if (EMAIL_LIKE.matcher(message).matches()) {
                 String email = message.trim().toLowerCase();
-                Optional<User> userOpt = userRepository.findByEmail(email).filter(u -> "customer".equalsIgnoreCase(u.getRole()));
+                Optional<User> userOpt = userRepository.findByEmail(email);
                 if (userOpt.isPresent()) {
                     User user = userOpt.get();
                     try {
@@ -336,16 +341,64 @@ public class WhatsAppChatbotService {
         return "Reply with your account email to link this number.";
     }
 
-    private String buildReply(User customer, String phone, String message) {
+    private String buildReply(User user, String phone, String message) {
         if (message.equalsIgnoreCase("menu") || message.equalsIgnoreCase("hi") || message.equalsIgnoreCase("hello") || message.isBlank()) {
             stageByPhone.put(phone, ChatStage.MAIN_MENU);
-            return buildMenu(customer);
+            return buildMenu(user);
         }
-        if (customer == null) {
+        if (user == null) {
             return "We don't have your number on file. Reply with your *account email* to link this WhatsApp number to your BiasharaHub account.";
         }
 
         String lower = message.toLowerCase().trim();
+        boolean isOwner = "owner".equalsIgnoreCase(user.getRole());
+        UUID businessId = user.getBusinessId();
+        boolean isProductSeller = isOwner && businessId != null && ("verified".equalsIgnoreCase(user.getVerificationStatus()) || user.getSellerTier() != null);
+        boolean isServiceProvider = isOwner && businessId != null && "verified".equalsIgnoreCase(user.getServiceProviderStatus());
+
+        // ===== OWNER (SELLER / PROVIDER) COMMANDS =====
+        // Sellers and providers only see/act on their own business (businessId); all methods filter by owner.getBusinessId().
+        if (isOwner) {
+            // Seller: orders to my shop (own business only)
+            if ((isProductSeller) && (lower.equals("orders") || lower.equals("shop orders") || lower.equals("my shop orders"))) {
+                return replySellerOrders(user, phone);
+            }
+            if (isProductSeller && (lower.startsWith("confirm ") || lower.startsWith("confirm order "))) {
+                String numPart = lower.replaceFirst("confirm order ", "").replaceFirst("confirm ", "").trim();
+                if (numPart.matches("\\d+")) return confirmOrder(user, phone, Integer.parseInt(numPart));
+            }
+            if (isProductSeller && (lower.startsWith("ship ") || lower.startsWith("ship order "))) {
+                String numPart = lower.replaceFirst("ship order ", "").replaceFirst("ship ", "").trim();
+                if (numPart.matches("\\d+")) return shipOrder(user, phone, Integer.parseInt(numPart));
+            }
+            if (isProductSeller && (lower.equals("products") || lower.equals("my products") || lower.equals("inventory"))) {
+                return replyMyProducts(user);
+            }
+            if (isProductSeller && (lower.equals("low stock") || lower.equals("stock alert"))) {
+                return replyLowStock(user);
+            }
+            // Provider: my appointments
+            if (isServiceProvider && (lower.equals("appointments") || lower.equals("my appointments") || lower.equals("bookings"))) {
+                return replyProviderAppointments(user, phone);
+            }
+            if (isServiceProvider && (lower.startsWith("confirm apt ") || lower.startsWith("confirm appointment "))) {
+                String numPart = lower.replaceFirst("confirm appointment ", "").replaceFirst("confirm apt ", "").trim();
+                if (numPart.matches("\\d+")) return confirmAppointment(user, phone, Integer.parseInt(numPart));
+            }
+            if (isServiceProvider && (lower.startsWith("cancel apt ") || lower.startsWith("cancel appointment "))) {
+                String numPart = lower.replaceFirst("cancel appointment ", "").replaceFirst("cancel apt ", "").trim();
+                if (numPart.matches("\\d+")) return cancelAppointment(user, phone, Integer.parseInt(numPart));
+            }
+            if (isServiceProvider && (lower.equals("my services") || lower.equals("seller services"))) {
+                return replyMyServicesList(user);
+            }
+            // Sellers and providers only get business-related commands; no customer flows (shops, order, pay, book, etc.)
+            if (isProductSeller || isServiceProvider) {
+                return buildMenu(user);
+            }
+        }
+
+        // ===== CUSTOMER-ONLY FLOWS (owners/sellers/providers do not get these) =====
         ChatStage stage = stageByPhone.getOrDefault(phone, ChatStage.MAIN_MENU);
 
         // If we are on the shops list screen, numeric replies pick a shop
@@ -364,7 +417,7 @@ public class WhatsAppChatbotService {
 
         // If on service list, numeric replies (single digit) default to BOOK
         if (stage == ChatStage.SERVICE_LIST && lower.matches("^\\d+$")) {
-            return createServiceBookingAndReply(customer, phone, Integer.parseInt(lower), null, null, null, null, null);
+            return createServiceBookingAndReply(user, phone, Integer.parseInt(lower), null, null, null, null, null);
         }
 
         // Global numeric shortcuts from main menu: 1–9
@@ -378,23 +431,23 @@ public class WhatsAppChatbotService {
                 return replyStockOrShops("stock");
             }
             if (lower.equals("3")) {
-                return replyOrderStatus(customer);
+                return replyOrderStatus(user);
             }
             if (lower.equals("4")) {
-                return replyPay(customer, phone);
+                return replyPay(user, phone);
             }
             if (lower.equals("5")) {
-                return replyDeliveryStatus(customer);
+                return replyDeliveryStatus(user);
             }
             if (lower.equals("6")) {
                 stageByPhone.put(phone, ChatStage.SERVICE_PROVIDER_LIST);
                 return replyServiceProviders(phone);
             }
             if (lower.equals("7")) {
-                return replyMyBookings(customer, phone);
+                return replyMyBookings(user, phone);
             }
             if (lower.equals("8")) {
-                return replyUnpaidServiceBookings(customer, phone);
+                return replyUnpaidServiceBookings(user, phone);
             }
         }
 
@@ -418,8 +471,9 @@ public class WhatsAppChatbotService {
 
         // ===== SERVICE PROVIDER COMMANDS =====
 
-        // List service providers: "SERVICES", "PROVIDERS", "SERVICE PROVIDERS"
-        if (lower.equals("services") || lower.equals("providers") || lower.equals("service providers") || lower.contains("browse services")) {
+        // List service providers: "SERVICES", "PROVIDERS", "SERVICE PROVIDERS", "CATEGORIES" (we show providers, then their services)
+        if (lower.equals("services") || lower.equals("providers") || lower.equals("service providers") || lower.contains("browse services")
+                || lower.equals("categories") || lower.equals("service categories")) {
             stageByPhone.put(phone, ChatStage.SERVICE_PROVIDER_LIST);
             return replyServiceProviders(phone);
         }
@@ -451,7 +505,7 @@ public class WhatsAppChatbotService {
             if (locationMatcher.matches()) {
                 int listNum = Integer.parseInt(locationMatcher.group(1));
                 String locationDesc = locationMatcher.group(2).trim();
-                return createServiceBookingAndReply(customer, phone, listNum, null, null, null, null, locationDesc);
+                return createServiceBookingAndReply(user, phone, listNum, null, null, null, null, locationDesc);
             }
             // Full pattern: "BOOK 1 2026-02-25 10:00 at Westlands"
             var bookMatcher = BOOK_SERVICE.matcher(message.trim());
@@ -460,13 +514,13 @@ public class WhatsAppChatbotService {
                 String dateStr = bookMatcher.group(2);
                 String timeStr = bookMatcher.group(3);
                 String locationDesc = bookMatcher.group(4) != null ? bookMatcher.group(4).trim() : null;
-                return createServiceBookingAndReply(customer, phone, listNum, dateStr, timeStr, null, null, locationDesc);
+                return createServiceBookingAndReply(user, phone, listNum, dateStr, timeStr, null, null, locationDesc);
             }
         }
 
         // My bookings / appointments
         if (lower.equals("bookings") || lower.equals("my bookings") || lower.equals("appointments") || lower.contains("my appointment")) {
-            return replyMyBookings(customer, phone);
+            return replyMyBookings(user, phone);
         }
 
         // Pay for service booking: "PAY SERVICE 1" or "PAY SERVICE <booking-id>"
@@ -474,13 +528,13 @@ public class WhatsAppChatbotService {
             var payServiceMatcher = PAY_SERVICE.matcher(message.trim());
             if (payServiceMatcher.matches()) {
                 String bookingToken = payServiceMatcher.group(1);
-                return replyPayForServiceBooking(customer, phone, bookingToken);
+                return replyPayForServiceBooking(user, phone, bookingToken);
             }
         }
 
         // Unpaid service bookings
         if (lower.contains("unpaid service") || lower.contains("service to pay")) {
-            return replyUnpaidServiceBookings(customer, phone);
+            return replyUnpaidServiceBookings(user, phone);
         }
 
         // ===== PRODUCT ORDER COMMANDS =====
@@ -495,7 +549,7 @@ public class WhatsAppChatbotService {
                 if (productIds != null && listNum >= 1 && listNum <= productIds.size()) {
                     UUID productId = productIds.get(listNum - 1);
                     boolean payCash = lower.endsWith(" cash");
-                    return createOrderAndReply(customer, productId, qty, payCash ? "Cash" : "M-Pesa");
+                    return createOrderAndReply(user, productId, qty, payCash ? "Cash" : "M-Pesa");
                 }
                 return "View a product list first: reply 1 for Shops, pick a shop, then reply ORDER <number> <qty> (e.g. ORDER 1 2). Or reply MENU for main menu.";
             }
@@ -506,7 +560,7 @@ public class WhatsAppChatbotService {
                         UUID productId = UUID.fromString(matcher.group(1));
                         int qty = Integer.parseInt(matcher.group(2));
                         boolean payCash = lower.endsWith(" cash");
-                        return createOrderAndReply(customer, productId, qty, payCash ? "Cash" : "M-Pesa");
+                        return createOrderAndReply(user, productId, qty, payCash ? "Cash" : "M-Pesa");
                     } catch (Exception e) {
                         log.warn("WhatsApp order parse failed: {}", e.getMessage());
                     }
@@ -514,51 +568,79 @@ public class WhatsAppChatbotService {
             }
         }
         if (lower.equals("order") || lower.contains("my order")) {
-            return replyOrderStatus(customer);
+            return replyOrderStatus(user);
         }
         // Unpaid orders: same as PAY – list orders that need payment
         if (lower.contains("unpaid") || lower.contains("orders to pay") || lower.contains("pay for order")) {
             var payMatcher = PAY_ORDER.matcher(message.trim());
             if (payMatcher.matches()) {
                 String orderToken = payMatcher.group(1);
-                return replyPayForSpecificOrder(customer, phone, orderToken);
+                return replyPayForSpecificOrder(user, phone, orderToken);
             }
-            return replyPay(customer, phone);
+            return replyPay(user, phone);
         }
         // Pay: list unpaid orders or pay for specific order (but not "pay service")
         if ((lower.startsWith("pay") || lower.contains("pay now") || lower.contains("payment")) && !lower.contains("service")) {
             var payMatcher = PAY_ORDER.matcher(message.trim());
             if (payMatcher.matches()) {
                 String orderToken = payMatcher.group(1);
-                return replyPayForSpecificOrder(customer, phone, orderToken);
+                return replyPayForSpecificOrder(user, phone, orderToken);
             }
-            return replyPay(customer, phone);
+            return replyPay(user, phone);
         }
         // Delivery / shipment status
         if (lower.contains("delivery") || lower.contains("shipment") || lower.contains("track")) {
-            return replyDeliveryStatus(customer);
+            return replyDeliveryStatus(user);
         }
-        return buildMenu(customer);
+        return buildMenu(user);
     }
 
-    private String buildMenu(User customer) {
+    private String buildMenu(User user) {
         StringBuilder sb = new StringBuilder();
         sb.append("BiasharaHub 24/7 Assistant\n\n");
-        sb.append("*PRODUCTS*\n");
-        sb.append("1. Product shops – reply SHOPS to browse shops\n");
-        sb.append("2. Check stock – reply STOCK or STOCK <shop>\n");
-        sb.append("3. My orders – reply ORDER\n");
-        sb.append("4. Pay for order – reply PAY\n");
-        sb.append("5. Delivery status – reply DELIVERY\n\n");
-        sb.append("*SERVICES*\n");
-        sb.append("6. Service providers – reply SERVICES\n");
-        sb.append("   📍 View provider locations with LOCATION <number>\n");
-        sb.append("7. My bookings – reply BOOKINGS\n");
-        sb.append("8. Pay for booking – reply PAY SERVICE\n\n");
-        if (customer == null) {
-            sb.append("Register at ").append(storefrontUrl).append(" with your phone to order products or book services.");
+        boolean isOwner = user != null && "owner".equalsIgnoreCase(user.getRole());
+        UUID businessId = user != null ? user.getBusinessId() : null;
+        boolean isProductSeller = isOwner && businessId != null && ("verified".equalsIgnoreCase(user.getVerificationStatus()) || user.getSellerTier() != null);
+        boolean isServiceProvider = isOwner && businessId != null && "verified".equalsIgnoreCase(user.getServiceProviderStatus());
+        boolean ownerOnlyMenu = isProductSeller || isServiceProvider;
+
+        if (ownerOnlyMenu) {
+            // Sellers and providers see only their business options; no customer (shops, order, book) options
+            if (isProductSeller) {
+                sb.append("*YOUR SHOP*\n");
+                sb.append("1. Shop orders – reply ORDERS\n");
+                sb.append("2. Confirm order – CONFIRM <n> (e.g. CONFIRM 1)\n");
+                sb.append("3. Mark shipped – SHIP <n> (e.g. SHIP 1)\n");
+                sb.append("4. My products – reply PRODUCTS\n");
+                sb.append("5. Low stock – reply LOW STOCK\n\n");
+            }
+            if (isServiceProvider) {
+                sb.append("*YOUR SERVICES*\n");
+                sb.append("6. Appointments – reply APPOINTMENTS\n");
+                sb.append("7. Confirm/Cancel – CONFIRM APT <n> / CANCEL APT <n>\n");
+                sb.append("8. My services – reply MY SERVICES\n\n");
+            }
+            sb.append("You can only manage your own business here. Reply MENU anytime.");
         } else {
-            sb.append("Visit ").append(storefrontUrl).append(" to browse and order. Reply MENU at any time.");
+            // Customer menu (or unlinked user)
+            sb.append("*PRODUCTS (shops)*\n");
+            sb.append("1. Browse shops – reply SHOPS\n");
+            sb.append("2. Check stock – reply STOCK or STOCK <shop>\n");
+            sb.append("3. My orders – reply ORDER\n");
+            sb.append("4. Pay for order – reply PAY\n");
+            sb.append("5. Delivery status – reply DELIVERY\n\n");
+            sb.append("*SERVICES (expertise, skills, talents)*\n");
+            sb.append("6. Service providers – reply SERVICES\n");
+            sb.append("   • Verified professionals (online or in-person)\n");
+            sb.append("   • Reply LOCATION <number> to see provider address/map before booking\n");
+            sb.append("   • For in-person: share your location or type BOOK 1 at <your address>\n");
+            sb.append("7. My bookings – reply MY BOOKINGS\n");
+            sb.append("8. Pay for booking – reply PAY SERVICE\n\n");
+            if (user == null) {
+                sb.append("Register at ").append(storefrontUrl).append(" to order products or book services.");
+            } else {
+                sb.append("Browse: ").append(storefrontUrl).append(" (shops & services). Reply MENU anytime.");
+            }
         }
         return sb.toString();
     }
@@ -889,6 +971,226 @@ public class WhatsAppChatbotService {
         return sb.toString();
     }
 
+    private static final int LOW_STOCK_THRESHOLD = 30;
+
+    /** Seller: list orders containing this business's products. */
+    private String replySellerOrders(User owner, String phone) {
+        UUID businessId = owner.getBusinessId();
+        if (businessId == null) return "No business linked. Use the dashboard to set up your shop.";
+        List<Order> orders = orderRepository.findOrdersContainingProductsByBusinessId(businessId);
+        if (orders.isEmpty()) {
+            return "No orders for your shop yet. Reply PRODUCTS to see your products, or MENU for main menu.";
+        }
+        int limit = Math.min(orders.size(), MAX_ORDERS_IN_REPLY);
+        List<UUID> orderIds = new ArrayList<>(limit);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Your shop orders:\n\n");
+        for (int i = 0; i < limit; i++) {
+            Order o = orders.get(i);
+            orderIds.add(o.getOrderId());
+            String customerName = o.getUser() != null && o.getUser().getName() != null ? o.getUser().getName() : "Customer";
+            sb.append(i + 1).append(". #").append(o.getOrderNumber()).append(" – ").append(customerName)
+                    .append(" – KES ").append(o.getTotalAmount()).append(" – ").append(o.getOrderStatus()).append("\n");
+        }
+        lastSellerOrderIdsByPhone.put(phone, orderIds);
+        if (orders.size() > limit) sb.append("\n... and ").append(orders.size() - limit).append(" more. Visit ").append(storefrontUrl).append(" for full list.");
+        sb.append("\n\nReply CONFIRM <n> to confirm, SHIP <n> to mark shipped (e.g. CONFIRM 1, SHIP 1).");
+        return sb.toString();
+    }
+
+    /** Seller: confirm order by list number; create shipment if confirmed and none exists. */
+    private String confirmOrder(User owner, String phone, int listNum) {
+        List<UUID> orderIds = lastSellerOrderIdsByPhone.get(phone);
+        if (orderIds == null || listNum < 1 || listNum > orderIds.size()) {
+            return "Reply ORDERS first to see your shop orders, then CONFIRM <number> (e.g. CONFIRM 1).";
+        }
+        UUID orderId = orderIds.get(listNum - 1);
+        return orderRepository.findById(orderId)
+                .filter(o -> orderBelongsToBusiness(o, owner.getBusinessId()))
+                .map(order -> {
+                    order.setOrderStatus("confirmed");
+                    orderRepository.save(order);
+                    List<Shipment> shipments = shipmentRepository.findByOrder(order);
+                    if (shipments.isEmpty()) {
+                        String mode = order.getDeliveryMode() != null ? order.getDeliveryMode() : "SELLER_SELF";
+                        String otp = ("SELLER_SELF".equalsIgnoreCase(mode) || "CUSTOMER_PICKUP".equalsIgnoreCase(mode))
+                                ? String.format("%06d", (int) (Math.random() * 1_000_000)) : null;
+                        Shipment shipment = Shipment.builder()
+                                .order(order)
+                                .deliveryMode(mode)
+                                .status("CREATED")
+                                .otpCode(otp)
+                                .build();
+                        shipmentRepository.save(shipment);
+                    }
+                    return "Order #" + order.getOrderNumber() + " confirmed. Reply SHIP " + listNum + " when you dispatch.";
+                })
+                .orElse("Order not found. Reply ORDERS to refresh the list.");
+    }
+
+    /** Seller: mark order as shipped by list number; set shipment status and shippedAt, notify customer. */
+    private String shipOrder(User owner, String phone, int listNum) {
+        List<UUID> orderIds = lastSellerOrderIdsByPhone.get(phone);
+        if (orderIds == null || listNum < 1 || listNum > orderIds.size()) {
+            return "Reply ORDERS first, then SHIP <number> (e.g. SHIP 1).";
+        }
+        UUID orderId = orderIds.get(listNum - 1);
+        return orderRepository.findById(orderId)
+                .filter(o -> orderBelongsToBusiness(o, owner.getBusinessId()))
+                .map(order -> {
+                    List<Shipment> shipments = shipmentRepository.findByOrder(order);
+                    Shipment shipment;
+                    if (shipments.isEmpty()) {
+                        String mode = order.getDeliveryMode() != null ? order.getDeliveryMode() : "SELLER_SELF";
+                        String otp = ("SELLER_SELF".equalsIgnoreCase(mode) || "CUSTOMER_PICKUP".equalsIgnoreCase(mode))
+                                ? String.format("%06d", (int) (Math.random() * 1_000_000)) : null;
+                        shipment = Shipment.builder()
+                                .order(order)
+                                .deliveryMode(mode)
+                                .status("IN_TRANSIT")
+                                .shippedAt(Instant.now())
+                                .otpCode(otp)
+                                .build();
+                        shipment = shipmentRepository.save(shipment);
+                    } else {
+                        shipment = shipments.get(0);
+                        shipment.setStatus("IN_TRANSIT");
+                        shipment.setShippedAt(Instant.now());
+                        shipment = shipmentRepository.save(shipment);
+                    }
+                    try { whatsAppNotificationService.notifyShipmentUpdated(shipment); } catch (Exception e) { log.warn("WhatsApp notify failed: {}", e.getMessage()); }
+                    try { inAppNotificationService.notifyShipmentUpdated(shipment); } catch (Exception e) { log.warn("In-app notify failed: {}", e.getMessage()); }
+                    return "Order #" + order.getOrderNumber() + " marked as shipped. Customer will be notified.";
+                })
+                .orElse("Order not found. Reply ORDERS to refresh the list.");
+    }
+
+    private boolean orderBelongsToBusiness(Order order, UUID businessId) {
+        if (order.getItems() == null || businessId == null) return false;
+        return order.getItems().stream()
+                .anyMatch(item -> item.getProduct() != null && businessId.equals(item.getProduct().getBusinessId()));
+    }
+
+    /** Seller: list my products (name, price, quantity). */
+    private String replyMyProducts(User owner) {
+        UUID businessId = owner.getBusinessId();
+        if (businessId == null) return "No business linked.";
+        List<Product> products = productRepository.findByBusinessId(businessId);
+        if (products.isEmpty()) return "No products yet. Add products at " + storefrontUrl;
+        int limit = Math.min(products.size(), MAX_PRODUCTS_IN_REPLY);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Your products:\n\n");
+        for (int i = 0; i < limit; i++) {
+            Product p = products.get(i);
+            int qty = p.getQuantity() != null ? p.getQuantity() : 0;
+            sb.append(i + 1).append(". ").append(p.getName() != null ? p.getName() : "Product")
+                    .append(" – KES ").append(p.getPrice()).append(" – qty ").append(qty).append("\n");
+        }
+        if (products.size() > limit) sb.append("\n... and ").append(products.size() - limit).append(" more.");
+        return sb.toString();
+    }
+
+    /** Seller: products with quantity <= LOW_STOCK_THRESHOLD. */
+    private String replyLowStock(User owner) {
+        UUID businessId = owner.getBusinessId();
+        if (businessId == null) return "No business linked.";
+        List<Product> products = productRepository.findByBusinessId(businessId);
+        List<Product> low = products.stream()
+                .filter(p -> (p.getQuantity() != null && p.getQuantity() <= LOW_STOCK_THRESHOLD))
+                .toList();
+        if (low.isEmpty()) return "No low-stock items (all above " + LOW_STOCK_THRESHOLD + " units). Reply PRODUCTS to see all.";
+        StringBuilder sb = new StringBuilder();
+        sb.append("Low stock (≤ ").append(LOW_STOCK_THRESHOLD).append("):\n\n");
+        for (int i = 0; i < Math.min(low.size(), MAX_PRODUCTS_IN_REPLY); i++) {
+            Product p = low.get(i);
+            int qty = p.getQuantity() != null ? p.getQuantity() : 0;
+            sb.append("• ").append(p.getName() != null ? p.getName() : "Product").append(" – ").append(qty).append(" left. KES ").append(p.getPrice()).append("\n");
+        }
+        return sb.toString();
+    }
+
+    /** Provider: list appointments for my services. */
+    private String replyProviderAppointments(User owner, String phone) {
+        UUID businessId = owner.getBusinessId();
+        if (businessId == null) return "No business linked. Use the dashboard to set up your services.";
+        List<ServiceAppointment> appointments = serviceAppointmentRepository.findByService_BusinessIdOrderByRequestedDateDesc(businessId);
+        if (appointments.isEmpty()) {
+            return "No appointments yet. Reply MY SERVICES to see your services, or MENU for main menu.";
+        }
+        int limit = Math.min(appointments.size(), MAX_BOOKINGS_IN_REPLY * 2);
+        List<UUID> ids = new ArrayList<>(limit);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Your appointments:\n\n");
+        for (int i = 0; i < limit; i++) {
+            ServiceAppointment apt = appointments.get(i);
+            ids.add(apt.getAppointmentId());
+            String serviceName = apt.getService() != null && apt.getService().getName() != null ? apt.getService().getName() : "Service";
+            String customerName = apt.getUser() != null && apt.getUser().getName() != null ? apt.getUser().getName() : "Customer";
+            sb.append(i + 1).append(". ").append(serviceName).append(" – ").append(customerName)
+                    .append(" – ").append(apt.getRequestedDate()).append(apt.getRequestedTime() != null ? " " + apt.getRequestedTime() : "")
+                    .append(" – ").append(apt.getStatus()).append("\n");
+        }
+        lastProviderAppointmentIdsByPhone.put(phone, ids);
+        if (appointments.size() > limit) sb.append("\n... and ").append(appointments.size() - limit).append(" more.");
+        sb.append("\n\nReply CONFIRM APT <n> or CANCEL APT <n> (e.g. CONFIRM APT 1).");
+        return sb.toString();
+    }
+
+    /** Provider: confirm appointment by list number. */
+    private String confirmAppointment(User owner, String phone, int listNum) {
+        List<UUID> ids = lastProviderAppointmentIdsByPhone.get(phone);
+        if (ids == null || listNum < 1 || listNum > ids.size()) {
+            return "Reply APPOINTMENTS first, then CONFIRM APT <number> (e.g. CONFIRM APT 1).";
+        }
+        UUID aptId = ids.get(listNum - 1);
+        return serviceAppointmentRepository.findById(aptId)
+                .filter(apt -> apt.getService() != null && owner.getBusinessId().equals(apt.getService().getBusinessId()))
+                .map(apt -> {
+                    apt.setStatus("CONFIRMED");
+                    serviceAppointmentRepository.save(apt);
+                    return "Appointment " + listNum + " confirmed. Customer will be notified.";
+                })
+                .orElse("Appointment not found. Reply APPOINTMENTS to refresh the list.");
+    }
+
+    /** Provider: cancel appointment by list number. */
+    private String cancelAppointment(User owner, String phone, int listNum) {
+        List<UUID> ids = lastProviderAppointmentIdsByPhone.get(phone);
+        if (ids == null || listNum < 1 || listNum > ids.size()) {
+            return "Reply APPOINTMENTS first, then CANCEL APT <number> (e.g. CANCEL APT 1).";
+        }
+        UUID aptId = ids.get(listNum - 1);
+        return serviceAppointmentRepository.findById(aptId)
+                .filter(apt -> apt.getService() != null && owner.getBusinessId().equals(apt.getService().getBusinessId()))
+                .map(apt -> {
+                    apt.setStatus("CANCELLED");
+                    serviceAppointmentRepository.save(apt);
+                    return "Appointment " + listNum + " cancelled.";
+                })
+                .orElse("Appointment not found. Reply APPOINTMENTS to refresh the list.");
+    }
+
+    /** Provider: list my service offerings. */
+    private String replyMyServicesList(User owner) {
+        UUID businessId = owner.getBusinessId();
+        if (businessId == null) return "No business linked.";
+        List<ServiceOffering> services = serviceOfferingRepository.findByBusinessIdWithCategory(businessId);
+        if (services.isEmpty()) return "No services yet. Add services at " + storefrontUrl;
+        int limit = Math.min(services.size(), MAX_SERVICES_IN_REPLY);
+        StringBuilder sb = new StringBuilder();
+        sb.append("Your services:\n\n");
+        for (int i = 0; i < limit; i++) {
+            ServiceOffering s = services.get(i);
+            String title = s.getName() != null ? s.getName() : "Service";
+            sb.append(i + 1).append(". ").append(title)
+                    .append(" – KES ").append(s.getPrice())
+                    .append(" – ").append(s.getDeliveryType() != null ? s.getDeliveryType() : "N/A")
+                    .append(s.getIsActive() != null && s.getIsActive() ? " (active)" : " (inactive)").append("\n");
+        }
+        if (services.size() > limit) sb.append("\n... and ").append(services.size() - limit).append(" more.");
+        return sb.toString();
+    }
+
     // ==================== SERVICE PROVIDER METHODS ====================
 
     /** List verified service providers (service_provider_status = verified). */
@@ -896,12 +1198,12 @@ public class WhatsAppChatbotService {
         List<User> providers = userRepository
                 .findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
         if (providers.isEmpty()) {
-            return "No service providers available at the moment. Visit " + storefrontUrl + "/services to check back later, or reply SHOPS to browse product shops.";
+            return "No verified service providers at the moment. Visit " + storefrontUrl + "/services to check back later.\n\nReply SHOPS to browse product shops, or MENU for main menu.";
         }
         int limit = Math.min(providers.size(), MAX_SERVICE_PROVIDERS_IN_REPLY);
         List<UUID> ids = new ArrayList<>(limit);
         StringBuilder sb = new StringBuilder();
-        sb.append("Service Providers on BiasharaHub:\n\n");
+        sb.append("Verified service providers (expertise, skills, talents):\n\n");
         for (int i = 0; i < limit; i++) {
             User p = providers.get(i);
             ids.add(p.getUserId());
@@ -914,7 +1216,6 @@ public class WhatsAppChatbotService {
             // Show location for physical/both delivery types
             if (("PHYSICAL".equalsIgnoreCase(deliveryType) || "BOTH".equalsIgnoreCase(deliveryType))) {
                 if (p.getServiceLocationDescription() != null && !p.getServiceLocationDescription().isBlank()) {
-                    // Truncate long descriptions
                     String locDesc = p.getServiceLocationDescription();
                     if (locDesc.length() > 40) locDesc = locDesc.substring(0, 37) + "...";
                     sb.append("\n   📍 ").append(locDesc);
@@ -929,9 +1230,10 @@ public class WhatsAppChatbotService {
             sb.append("\n... and ").append(providers.size() - limit).append(" more.");
         }
         sb.append("\n━━━━━━━━━━━━━━━━━━━━━━\n");
-        sb.append("• Reply 1, 2, 3... to see services\n");
-        sb.append("• Reply LOCATION <number> for provider location (e.g. LOCATION 1)\n");
-        sb.append("• Visit ").append(storefrontUrl).append("/services for map search");
+        sb.append("• Reply 1, 2, 3... to see their services and book\n");
+        sb.append("• Reply LOCATION <number> to see address & map (e.g. LOCATION 1)\n");
+        sb.append("• Online = video/phone/WhatsApp/email – see each service for details\n");
+        sb.append("• Browse on web: ").append(storefrontUrl).append("/services");
         return sb.toString();
     }
 
@@ -997,16 +1299,8 @@ public class WhatsAppChatbotService {
 
         if ("ONLINE".equalsIgnoreCase(deliveryType)) {
             sb.append("🌐 This provider offers *online/remote services only*.\n\n");
-            sb.append("*Services can be delivered via:*\n");
-            sb.append("📹 Video Call (Zoom, Google Meet, etc.)\n");
-            sb.append("📞 Phone Call\n");
-            sb.append("💬 WhatsApp chat/call\n");
-            sb.append("📧 Email consultations\n");
-            sb.append("🖥️ Screen sharing sessions\n");
-            sb.append("📁 Digital file delivery\n");
-            sb.append("🎬 Recorded content/tutorials\n\n");
-            sb.append("Each service specifies its delivery method.\n");
-            sb.append("Reply SERVICE ").append(providerArg).append(" to see their services and book.");
+            sb.append("*Delivery may include:* Video call, phone call, WhatsApp, live chat, email, screen share, file delivery, recorded content.\n\n");
+            sb.append("Each service shows how it's delivered. Reply SERVICE ").append(providerArg).append(" to see services and book.");
             return sb.toString();
         }
 
@@ -1125,20 +1419,21 @@ public class WhatsAppChatbotService {
             sb.append("📞 Contact: ").append(provider.getPhone()).append("\n\n");
         }
 
-        sb.append("*Available Services:*\n\n");
+        sb.append("*Available services:*\n\n");
         for (int i = 0; i < limit; i++) {
             ServiceOffering s = services.get(i);
             ids.add(s.getServiceId());
             String deliveryType = s.getDeliveryType();
             String typeLabel = "PHYSICAL".equalsIgnoreCase(deliveryType) ? "📍 In-person" : "🌐 Online";
-            String duration = s.getDurationMinutes() != null ? " (~" + s.getDurationMinutes() + "min)" : "";
-            sb.append(i + 1).append(". ").append(s.getName()).append("\n");
+            String duration = s.getDurationMinutes() != null ? " (~" + s.getDurationMinutes() + " min)" : "";
+            String categoryLine = (s.getCategory() != null && !s.getCategory().isBlank()) ? " [" + s.getCategory() + "]" : "";
+            sb.append(i + 1).append(". ").append(s.getName()).append(categoryLine).append("\n");
             sb.append("   💰 KES ").append(s.getPrice()).append(" | ").append(typeLabel).append(duration).append("\n");
             if (s.getDescription() != null && !s.getDescription().isBlank()) {
                 String desc = s.getDescription().length() > 55 ? s.getDescription().substring(0, 52) + "..." : s.getDescription();
                 sb.append("   ").append(desc).append("\n");
             }
-            // Show online delivery methods for virtual services
+            // Show online delivery methods for virtual/online services
             if ("VIRTUAL".equalsIgnoreCase(deliveryType) && s.getOnlineDeliveryMethods() != null && !s.getOnlineDeliveryMethods().isBlank()) {
                 sb.append("   ✨ Via: ").append(formatOnlineDeliveryMethods(s.getOnlineDeliveryMethods())).append("\n");
             }
@@ -1150,12 +1445,12 @@ public class WhatsAppChatbotService {
 
         sb.append("\n━━━━━━━━━━━━━━━━━━━━━━\n");
         sb.append("📝 *To book:*\n");
-        sb.append("• Reply BOOK <number> (e.g. BOOK 1)\n");
+        sb.append("• BOOK <number> (e.g. BOOK 1)\n");
         sb.append("• With date: BOOK 1 2026-02-25\n");
         if (hasPhysicalServices) {
-            sb.append("• For in-person: Share your location or type BOOK 1 at <your address>\n");
+            sb.append("• In-person: share your location (📎) or type BOOK 1 at <your address>\n");
         }
-        sb.append("\nReply SERVICES for other providers.");
+        sb.append("\nReply SERVICES for other providers, LOCATION for this provider's address.");
         return sb.toString();
     }
 
@@ -1171,12 +1466,12 @@ public class WhatsAppChatbotService {
                                                 Double locationLat, Double locationLng, String locationDescription) {
         List<UUID> serviceIds = lastServiceIdsByPhone.get(phone);
         if (serviceIds == null || listNum < 1 || listNum > serviceIds.size()) {
-            return "View a service list first: reply SERVICES to browse providers, pick one, then reply BOOK <number> (e.g. BOOK 1). Or reply MENU for main menu.";
+            return "Reply SERVICES to see providers → pick one → then BOOK <number> (e.g. BOOK 1). Reply MENU for main menu.";
         }
         UUID serviceId = serviceIds.get(listNum - 1);
         ServiceOffering service = serviceOfferingRepository.findByServiceIdWithCategory(serviceId).orElse(null);
         if (service == null || service.getIsActive() == null || !service.getIsActive()) {
-            return "Service not available. Reply SERVICES to browse other services.";
+            return "That service isn't available. Reply SERVICES to browse and pick another.";
         }
 
         LocalDate requestedDate;
@@ -1225,13 +1520,11 @@ public class WhatsAppChatbotService {
 
         // For physical services, prompt for location if not provided
         if (isPhysical && finalLat == null && finalLng == null && (finalLocationDesc == null || finalLocationDesc.isBlank())) {
-            return "📍 This is an in-person service. Please provide your location:\n\n"
-                    + "Option 1: Share your location using WhatsApp's location feature (📎 → Location)\n\n"
-                    + "Option 2: Type your address:\n"
-                    + "BOOK " + listNum + " at <your address>\n"
-                    + "(e.g. BOOK " + listNum + " at Westlands Mall, Nairobi)\n\n"
-                    + "Option 3: Book with date and location:\n"
-                    + "BOOK " + listNum + " 2026-02-25 at <your address>";
+            return "📍 In-person service – we need your location:\n\n"
+                    + "• Share location: tap 📎 → Location → Send\n"
+                    + "• Or type: BOOK " + listNum + " at <your address>\n"
+                    + "  (e.g. BOOK " + listNum + " at Westlands Mall, Nairobi)\n\n"
+                    + "Reply with your location or address to continue.";
         }
 
         try {
@@ -1297,7 +1590,7 @@ public class WhatsAppChatbotService {
     private String replyMyBookings(User customer, String phone) {
         List<ServiceAppointment> bookings = serviceAppointmentRepository.findByUserIdOrderByRequestedDateDesc(customer.getUserId());
         if (bookings.isEmpty()) {
-            return "You have no service bookings yet. Reply SERVICES to browse service providers, or ORDER to see your product orders.";
+            return "You have no service bookings yet. Reply SERVICES to browse verified providers and book, or ORDER to see your product orders.";
         }
         int limit = Math.min(bookings.size(), MAX_BOOKINGS_IN_REPLY);
         List<UUID> ids = new ArrayList<>(limit);
@@ -1312,7 +1605,6 @@ public class WhatsAppChatbotService {
             String status = a.getStatus() != null ? a.getStatus() : "PENDING";
             BigDecimal price = a.getService() != null ? a.getService().getPrice() : BigDecimal.ZERO;
 
-            // Check payment status
             boolean unpaid = serviceBookingPaymentRepository.findByAppointmentAndPaymentStatus(a, "pending").isPresent();
 
             sb.append(i + 1).append(". ").append(serviceName).append(" – ").append(dateStr).append(timeStr).append("\n");
@@ -1325,7 +1617,7 @@ public class WhatsAppChatbotService {
             sb.append("\n... and ").append(bookings.size() - limit).append(" more.");
         }
         sb.append("\n\nReply PAY SERVICE <number> to pay (e.g. PAY SERVICE 1).\n");
-        sb.append("Reply SERVICES to browse more, MENU for main menu.");
+        sb.append("Reply SERVICES to book more, MENU for main menu.");
         return sb.toString();
     }
 
@@ -1338,7 +1630,7 @@ public class WhatsAppChatbotService {
                 .collect(Collectors.toList());
 
         if (unpaidBookings.isEmpty()) {
-            return "You have no unpaid service bookings. Reply BOOKINGS to see all bookings, or SERVICES to browse and book services.";
+            return "You have no unpaid service bookings. Reply BOOKINGS to see all, or SERVICES to browse and book.";
         }
         int limit = Math.min(unpaidBookings.size(), MAX_BOOKINGS_IN_REPLY);
         List<UUID> ids = new ArrayList<>(limit);
@@ -1355,8 +1647,8 @@ public class WhatsAppChatbotService {
         if (unpaidBookings.size() > limit) {
             sb.append("\n... and ").append(unpaidBookings.size() - limit).append(" more.");
         }
-        sb.append("\n\nReply PAY SERVICE <number> to pay (e.g. PAY SERVICE 1).\n");
-        sb.append("Reply BOOKINGS for all bookings, MENU for main menu.");
+        sb.append("\n\nReply PAY SERVICE <number> (e.g. PAY SERVICE 1) to pay with M-Pesa.\n");
+        sb.append("Reply BOOKINGS for all, MENU for main menu.");
         return sb.toString();
     }
 

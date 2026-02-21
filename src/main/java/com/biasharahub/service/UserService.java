@@ -75,6 +75,8 @@ public class UserService {
                 .twoFactorEnabled(false)
                 .businessName(request.getBusinessName() != null ? request.getBusinessName().trim() : null)
                 .applyingForTier(t)
+                // Explicitly clear service provider status (product seller only)
+                .serviceProviderStatus(null)
                 .build();
         owner = userRepository.save(owner);
         owner.setBusinessId(owner.getUserId());
@@ -111,6 +113,12 @@ public class UserService {
                 .role("owner")
                 .twoFactorEnabled(false)
                 .businessName(businessName)
+                // Service provider: pending status for verification
+                .serviceProviderStatus("pending")
+                // Explicitly clear product seller fields (override @Builder.Default)
+                .sellerTier(null)
+                .verificationStatus(null)
+                .applyingForTier(null)
                 .build();
         owner = userRepository.save(owner);
         owner.setBusinessId(owner.getUserId());
@@ -166,7 +174,12 @@ public class UserService {
                 .role("owner")
                 .twoFactorEnabled(false)
                 .businessName(businessName)
+                // Product seller fields: only set if selling products
                 .applyingForTier(applyingForTier)
+                .sellerTier(request.isSellsProducts() ? "tier1" : null)
+                .verificationStatus(request.isSellsProducts() ? "pending" : null)
+                // Service provider fields: only set if offering services
+                .serviceProviderStatus(request.isOffersServices() ? "pending" : null)
                 .build();
         owner = userRepository.save(owner);
         owner.setBusinessId(owner.getUserId());
@@ -338,6 +351,9 @@ public class UserService {
                 .verificationNotes(user.getVerificationNotes())
                 .sellerTier(user.getSellerTier())
                 .applyingForTier(user.getApplyingForTier())
+                // Service provider fields
+                .serviceProviderStatus(user.getServiceProviderStatus())
+                .serviceDeliveryType(user.getServiceDeliveryType())
                 .build();
     }
 }

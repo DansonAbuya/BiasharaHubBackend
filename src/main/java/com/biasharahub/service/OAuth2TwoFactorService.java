@@ -153,10 +153,16 @@ public class OAuth2TwoFactorService {
                 .id(user.getUserId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .phone(user.getPhone())
                 .role(user.getRole())
                 .businessId(user.getBusinessId() != null ? user.getBusinessId().toString() : null)
                 .businessName(user.getBusinessName())
+                .verificationStatus(user.getVerificationStatus())
+                .sellerTier(user.getSellerTier())
                 .applyingForTier(user.getApplyingForTier())
+                // Service provider fields
+                .serviceProviderStatus(user.getServiceProviderStatus())
+                .serviceDeliveryType(user.getServiceDeliveryType())
                 .build();
     }
 }

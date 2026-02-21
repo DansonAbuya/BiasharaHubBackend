@@ -56,5 +56,6 @@
     <include file="db/changelog/changes/049-service-provider-location.xml"/>
     <include file="db/changelog/changes/050-service-appointment-customer-location.xml"/>
     <include file="db/changelog/changes/051-online-delivery-methods.xml"/>
+    <include file="db/changelog/changes/052-service-offering-media.xml"/>
 
 </databaseChangeLog>
