@@ -168,7 +168,7 @@ public class User {
     @Builder.Default
     private Integer strikeCount = 0;
 
-    /** Trust & Safety: active, suspended, banned. */
+    /** Trust & Safety: active, suspended, banned. Admin can set disabled to block login and hide from marketplace. */
     @Column(name = "account_status", length = 32)
     @Builder.Default
     private String accountStatus = "active";

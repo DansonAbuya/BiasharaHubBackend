@@ -8,6 +8,7 @@ import com.biasharahub.dto.request.RegisterRequest;
 import com.biasharahub.dto.request.ResetPasswordRequest;
 import com.biasharahub.dto.request.VerifyCodeRequest;
 import com.biasharahub.dto.response.LoginResponse;
+import com.biasharahub.exception.AccountDisabledException;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.AuthService;
 import com.biasharahub.service.OAuth2TwoFactorService;
@@ -45,11 +46,15 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        Optional<LoginResponse> result = authService.login(request);
-        if (result.isPresent()) {
-            return ResponseEntity.ok(result.get());
+        try {
+            Optional<LoginResponse> result = authService.login(request);
+            if (result.isPresent()) {
+                return ResponseEntity.ok(result.get());
+            }
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid email or password"));
+        } catch (AccountDisabledException e) {
+            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
         }
-        return ResponseEntity.status(401).body(Map.of("error", "Invalid email or password"));
     }
 
     /**
@@ -65,11 +70,15 @@ public class AuthController {
 
     @PostMapping("/verify-code")
     public ResponseEntity<?> verifyCode(@Valid @RequestBody VerifyCodeRequest request) {
-        Optional<LoginResponse> result = authService.verifyCode(request);
-        if (result.isPresent()) {
-            return ResponseEntity.ok(result.get());
+        try {
+            Optional<LoginResponse> result = authService.verifyCode(request);
+            if (result.isPresent()) {
+                return ResponseEntity.ok(result.get());
+            }
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid or expired code"));
+        } catch (AccountDisabledException e) {
+            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
         }
-        return ResponseEntity.status(401).body(Map.of("error", "Invalid or expired code"));
     }
 
     @PostMapping("/refresh")
