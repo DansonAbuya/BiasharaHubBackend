@@ -12,5 +12,10 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     List<Notification> findByUserOrderByCreatedAtDesc(User user);
 
     List<Notification> findByUserAndReadIsFalseOrderByCreatedAtDesc(User user);
+
+    /** List by user id (same schema); ensures correct list when listing for current user. */
+    List<Notification> findByUser_UserIdOrderByCreatedAtDesc(UUID userId);
+
+    List<Notification> findByUser_UserIdAndReadIsFalseOrderByCreatedAtDesc(UUID userId);
 }
 
