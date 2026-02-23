@@ -6,6 +6,7 @@ import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.PaymentRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,12 +18,16 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReconciliationService {
 
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final TenantWalletService tenantWalletService;
     private final OrderEventPublisher orderEventPublisher;
+    private final InAppNotificationService inAppNotificationService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
+    private final SmsNotificationService smsNotificationService;
 
     /**
      * List pending payments (awaiting M-Pesa callback or manual confirmation).
@@ -67,6 +72,16 @@ public class ReconciliationService {
                     tenantWalletService.recordIncomingPaymentForCurrentTenant(
                             payment.getAmount(), order.getOrderId().toString(), payment.getPaymentId().toString());
                     orderEventPublisher.paymentCompleted(order.getOrderId(), payment.getPaymentId());
+                    // Notify sellers synchronously so they receive payment-completed notifications
+                    orderRepository.findByIdWithItems(order.getOrderId()).ifPresent(o -> {
+                        try {
+                            inAppNotificationService.notifySellerPaymentCompleted(o);
+                            whatsAppNotificationService.notifySellerPaymentCompleted(o);
+                            smsNotificationService.notifySellerPaymentCompleted(o);
+                        } catch (Exception e) {
+                            log.warn("Failed to send payment-completed notifications to seller for order {}: {}", o.getOrderId(), e.getMessage());
+                        }
+                    });
                     return payment;
                 })
                 .orElse(null);

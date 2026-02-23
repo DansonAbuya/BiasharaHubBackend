@@ -38,6 +38,7 @@ public class PaymentController {
     private final TenantWalletService tenantWalletService;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final InAppNotificationService inAppNotificationService;
+    private final SmsNotificationService smsNotificationService;
 
     /** Initiate payment for an order via M-PESA STK Push. */
     @PostMapping("/{orderId}/payments/initiate")
@@ -164,6 +165,16 @@ public class PaymentController {
                     tenantWalletService.recordIncomingPaymentForCurrentTenant(
                             payment.getAmount(), orderId.toString(), paymentId.toString());
                     orderEventPublisher.paymentCompleted(orderId, paymentId);
+                    // Notify sellers synchronously so they receive payment-completed notifications
+                    orderRepository.findByIdWithItems(orderId).ifPresent(o -> {
+                        try {
+                            inAppNotificationService.notifySellerPaymentCompleted(o);
+                            whatsAppNotificationService.notifySellerPaymentCompleted(o);
+                            smsNotificationService.notifySellerPaymentCompleted(o);
+                        } catch (Exception e) {
+                            // log and continue
+                        }
+                    });
                     return ResponseEntity.ok(java.util.Map.of("status", "completed", "paymentId", paymentId));
                 })
                 .orElse(ResponseEntity.notFound().build());

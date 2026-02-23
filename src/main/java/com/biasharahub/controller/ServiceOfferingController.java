@@ -414,15 +414,18 @@ public class ServiceOfferingController {
                             .paymentMethod("M-Pesa")
                             .build();
                     serviceBookingPaymentRepository.save(payment);
-                    try {
-                        inAppNotificationService.notifyServiceBookingCreated(saved);
-                        inAppNotificationService.notifyProviderServiceBookingCreated(saved);
-                        whatsAppNotificationService.notifyServiceBookingCreated(saved);
-                        whatsAppNotificationService.notifyProviderServiceBookingCreated(saved);
-                        smsNotificationService.notifyProviderServiceBookingCreated(saved);
-                    } catch (Exception ex) {
-                        log.warn("Failed to send service booking notifications for appointment {}: {}", saved.getAppointmentId(), ex.getMessage());
-                    }
+                    // Reload with service so provider notification can resolve businessId; then notify customer + provider
+                    serviceAppointmentRepository.findByAppointmentIdWithDetails(saved.getAppointmentId()).ifPresent(appointment -> {
+                        try {
+                            inAppNotificationService.notifyServiceBookingCreated(appointment);
+                            inAppNotificationService.notifyProviderServiceBookingCreated(appointment);
+                            whatsAppNotificationService.notifyServiceBookingCreated(appointment);
+                            whatsAppNotificationService.notifyProviderServiceBookingCreated(appointment);
+                            smsNotificationService.notifyProviderServiceBookingCreated(appointment);
+                        } catch (Exception ex) {
+                            log.warn("Failed to send service booking notifications for appointment {}: {}", appointment.getAppointmentId(), ex.getMessage());
+                        }
+                    });
                     return ResponseEntity.ok(toAppointmentDto(saved));
                 })
                 .orElse(ResponseEntity.notFound().build());
