@@ -132,6 +132,15 @@ public class SmsNotificationService {
         smsClient.send(phone, body);
     }
 
+    /** Notify owner when their account has been re-enabled by admin. */
+    public void notifyAccountEnabled(User user) {
+        if (user == null) return;
+        String phone = user.getPhone();
+        if (phone == null || phone.isBlank()) return;
+        String body = "BiasharaHub: Your account has been enabled. You can log in again and receive orders.";
+        smsClient.send(phone, body);
+    }
+
     // ---------- Service bookings (BiasharaHub Services) ----------
 
     /** Notify provider (owner + staff) when a new service appointment is booked. */

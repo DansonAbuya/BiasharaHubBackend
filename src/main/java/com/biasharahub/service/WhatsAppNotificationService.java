@@ -268,6 +268,15 @@ public class WhatsAppNotificationService {
         client.sendMessage(phone, body);
     }
 
+    /** Notify owner when their account has been re-enabled by admin. */
+    public void notifyAccountEnabled(User user) {
+        if (user == null) return;
+        String phone = user.getPhone();
+        if (phone == null || phone.isBlank()) return;
+        String body = "BiasharaHub: Your account has been enabled. You can log in again and receive orders.";
+        client.sendMessage(phone, body);
+    }
+
     public void notifyShipmentUpdated(Shipment shipment) {
         UUID orderId = shipmentRepository.findOrderIdByShipmentId(shipment.getShipmentId()).orElse(null);
         if (orderId == null) return;
