@@ -74,8 +74,8 @@ public class WhatsAppNotificationService {
     /** Returns owners and staff for the business who have an active account (receive notifications). */
     private List<User> getSellerUsers(UUID businessId) {
         List<User> out = new ArrayList<>();
-        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
-        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
         if (owners != null) out.addAll(owners);
         if (staff != null) out.addAll(staff);
         return out.stream()
