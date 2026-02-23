@@ -17,6 +17,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     List<User> findByRoleAndBusinessId(String role, UUID businessId);
 
+    /** Case-insensitive: find users by role and business (e.g. owner, staff) for seller notifications. */
+    List<User> findByRoleIgnoreCaseAndBusinessId(String role, UUID businessId);
+
     /** Find owners whose business name contains the given string (for customer filter by business). */
     List<User> findByRoleIgnoreCaseAndBusinessNameContainingIgnoreCase(String role, String businessName);
 
