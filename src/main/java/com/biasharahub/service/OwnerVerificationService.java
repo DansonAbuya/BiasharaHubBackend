@@ -9,6 +9,7 @@ import com.biasharahub.repository.OwnerVerificationDocumentRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,10 +20,12 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OwnerVerificationService {
 
     private final UserRepository userRepository;
     private final OwnerVerificationDocumentRepository documentRepository;
+    private final MailService mailService;
 
     /** Document types per BiasharaHub Trust & Verification Process. */
     public static final String DOC_TYPE_ID = "national_id";
@@ -159,7 +162,36 @@ public class OwnerVerificationService {
             owner.setSellerTier(t);
         }
         owner = userRepository.save(owner);
+        try {
+            String email = owner.getEmail();
+            String name = owner.getName() != null ? owner.getName() : "Seller";
+            String businessName = owner.getBusinessName();
+            if ("verified".equalsIgnoreCase(status)) {
+                mailService.sendProductSellerVerificationApproved(email, name, businessName);
+            } else if ("rejected".equalsIgnoreCase(status)) {
+                mailService.sendProductSellerVerificationRejected(email, name, businessName, notes);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send verification outcome email to owner {}: {}", owner.getUserId(), e.getMessage());
+        }
         return toUserDto(owner);
+    }
+
+    /**
+     * Owner: submit verification documents for review. Sends "documents received" email and returns success.
+     * Frontend should then show "check your email" and log the user out to home.
+     */
+    @Transactional
+    public void submitForReview(AuthenticatedUser currentUser) {
+        User owner = userRepository.findById(currentUser.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (!"owner".equalsIgnoreCase(owner.getRole())) {
+            throw new IllegalArgumentException("Only owners can submit for verification");
+        }
+        String email = owner.getEmail();
+        String name = owner.getName() != null ? owner.getName() : "Seller";
+        String businessName = owner.getBusinessName();
+        mailService.sendProductSellerDocumentsReceived(email, name, businessName);
     }
 
     private OwnerVerificationDocumentDto toDto(OwnerVerificationDocument d) {
