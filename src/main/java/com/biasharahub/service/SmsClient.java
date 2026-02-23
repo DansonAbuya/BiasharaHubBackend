@@ -55,9 +55,20 @@ public class SmsClient {
         }
     }
 
+    /**
+     * Normalize to E.164. US numbers (1 + 10 digits) must stay as +1...; do not prefix with +254.
+     * Kenyan numbers: 254..., 07..., or 9 digits without leading 0 get +254.
+     */
     private static String normalizeE164(String phone) {
         if (phone == null || phone.isBlank()) return phone;
         String digits = phone.replaceAll("\\D", "");
+        // US/Canada: 1 + 10 digits -> +1xxxxxxxxxx, or 10 digits (no country code) -> +1xxxxxxxxxx (e.g. Twilio "from" number)
+        if (digits.startsWith("1") && digits.length() == 11) {
+            return "+" + digits;
+        }
+        if (digits.length() == 10 && !digits.startsWith("0") && !digits.startsWith("254")) {
+            return "+1" + digits;
+        }
         if (digits.startsWith("254") && digits.length() >= 12) {
             return "+" + digits;
         }
