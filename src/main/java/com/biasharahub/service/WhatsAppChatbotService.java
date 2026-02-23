@@ -350,6 +350,11 @@ public class WhatsAppChatbotService {
             return "We don't have your number on file. Reply with your *account email* to link this WhatsApp number to your BiasharaHub account.";
         }
 
+        String accountStatus = user.getAccountStatus();
+        if (accountStatus != null && !"active".equalsIgnoreCase(accountStatus)) {
+            return "Your account is disabled. Please contact the admin.";
+        }
+
         String lower = message.toLowerCase().trim();
         boolean isOwner = "owner".equalsIgnoreCase(user.getRole());
         UUID businessId = user.getBusinessId();
@@ -647,7 +652,7 @@ public class WhatsAppChatbotService {
 
     /** List all shops (verified stores). */
     private String replyShops() {
-        List<User> owners = userRepository.findByRoleIgnoreCaseAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
+        List<User> owners = userRepository.findActiveOwnersByRoleAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
         if (owners.isEmpty()) {
             return "No shops available at the moment. Visit " + storefrontUrl + " to check back later.";
         }
@@ -674,7 +679,7 @@ public class WhatsAppChatbotService {
         if (shopArg != null && shopArg.trim().equalsIgnoreCase("all")) {
             return replyStock(phone);
         }
-        List<User> owners = userRepository.findByRoleIgnoreCaseAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
+        List<User> owners = userRepository.findActiveOwnersByRoleAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
         if (owners.isEmpty()) return "No shops available.";
 
         UUID businessId = null;
@@ -1196,7 +1201,7 @@ public class WhatsAppChatbotService {
     /** List verified service providers (service_provider_status = verified). */
     private String replyServiceProviders(String phone) {
         List<User> providers = userRepository
-                .findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
+                .findActiveOwnersByRoleAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
         if (providers.isEmpty()) {
             return "No verified service providers at the moment. Visit " + storefrontUrl + "/services to check back later.\n\nReply SHOPS to browse product shops, or MENU for main menu.";
         }
@@ -1276,7 +1281,7 @@ public class WhatsAppChatbotService {
         } catch (NumberFormatException ignored) {
             // Search by name
             List<User> providers = userRepository
-                    .findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
+                    .findActiveOwnersByRoleAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
             String search = providerArg.trim().toLowerCase();
             for (User p : providers) {
                 String name = p.getBusinessName() != null ? p.getBusinessName() : p.getName();
@@ -1348,7 +1353,7 @@ public class WhatsAppChatbotService {
         } catch (NumberFormatException ignored) {
             // Search by name
             List<User> providers = userRepository
-                    .findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
+                    .findActiveOwnersByRoleAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
             String search = providerArg.trim().toLowerCase();
             for (User p : providers) {
                 String name = p.getBusinessName() != null ? p.getBusinessName() : p.getName();

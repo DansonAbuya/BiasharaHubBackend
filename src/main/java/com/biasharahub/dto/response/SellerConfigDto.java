@@ -30,6 +30,8 @@ public class SellerConfigDto implements Serializable {
     private String businessName;
     private String sellerTier;
     private String verificationStatus;
+    /** Account status: active, disabled, etc. Used for admin disable/enable. */
+    private String accountStatus;
 
     private String pricingPlan;
 

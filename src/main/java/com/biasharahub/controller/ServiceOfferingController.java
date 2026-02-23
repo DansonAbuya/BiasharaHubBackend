@@ -122,7 +122,7 @@ public class ServiceOfferingController {
             @RequestParam(required = false) String deliveryType,
             @RequestParam(required = false) String search) {
         List<User> verifiedProviders = userRepository
-                .findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
+                .findActiveOwnersByRoleAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified");
 
         return verifiedProviders.stream()
                 .filter(u -> {
@@ -219,7 +219,7 @@ public class ServiceOfferingController {
         }
         // Only businesses whose owner is verified as a service provider (separate from product seller verification)
         Set<UUID> verifiedBusinessIds = userRepository
-                .findByRoleIgnoreCaseAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified")
+                .findActiveOwnersByRoleAndServiceProviderStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified")
                 .stream()
                 .map(User::getBusinessId)
                 .filter(id -> id != null)

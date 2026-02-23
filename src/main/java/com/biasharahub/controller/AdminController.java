@@ -4,6 +4,7 @@ import com.biasharahub.dto.request.AddAssistantAdminRequest;
 import com.biasharahub.dto.request.AddBusinessOwnerRequest;
 import com.biasharahub.dto.request.AddOwnerRequest;
 import com.biasharahub.dto.request.AddServiceProviderRequest;
+import com.biasharahub.dto.request.SetAccountStatusRequest;
 import com.biasharahub.dto.response.UserDto;
 import com.biasharahub.service.UserService;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Platform admin endpoints. super_admin and assistant_admin can add owners (onboard businesses).
@@ -94,6 +96,21 @@ public class AdminController {
         try {
             UserDto assistantAdmin = userService.addAssistantAdmin(request);
             return ResponseEntity.ok(assistantAdmin);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Disable or enable a product seller or service provider (owner) account.
+     * Disabled: user cannot log in (told to contact admin), and their shop/services are hidden from customers and WhatsApp.
+     */
+    @PatchMapping("/users/{userId}/account-status")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+    public ResponseEntity<?> setOwnerAccountStatus(@PathVariable UUID userId, @Valid @RequestBody SetAccountStatusRequest request) {
+        try {
+            UserDto user = userService.setOwnerAccountStatus(userId, request.getStatus());
+            return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

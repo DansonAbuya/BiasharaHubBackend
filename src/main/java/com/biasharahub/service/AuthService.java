@@ -13,6 +13,7 @@ import com.biasharahub.entity.VerificationCode;
 import com.biasharahub.repository.PasswordResetTokenRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.repository.VerificationCodeRepository;
+import com.biasharahub.exception.AccountDisabledException;
 import com.biasharahub.security.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -100,26 +101,33 @@ public class AuthService {
 
     @Transactional
     public Optional<LoginResponse> login(LoginRequest request) {
-        return userRepository.findByEmail(request.getEmail().toLowerCase())
-                .filter(user -> passwordEncoder.matches(request.getPassword(), user.getPasswordHash()))
-                .filter(user -> user.getAccountStatus() == null || "active".equalsIgnoreCase(user.getAccountStatus()))
-                .map(user -> {
-                    if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
-                        verificationCodeService.createAndSend2FACode(user);
-                        return LoginResponse.builder()
-                                .requiresTwoFactor(true)
-                                .user(toUserDto(user))
-                                .build();
-                    }
-                    String token = jwtService.generateToken(user.getUserId(), user.getEmail(), user.getRole());
-                    String refreshToken = jwtService.generateRefreshToken(user.getUserId(), user.getEmail(), user.getRole());
-                    return LoginResponse.builder()
-                            .token(token)
-                            .refreshToken(refreshToken)
-                            .user(toUserDto(user))
-                            .requiresTwoFactor(false)
-                            .build();
-                });
+        User user = userRepository.findByEmail(request.getEmail().toLowerCase()).orElse(null);
+        if (user == null) {
+            return Optional.empty();
+        }
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            return Optional.empty();
+        }
+        String status = user.getAccountStatus();
+        if (status != null && !"active".equalsIgnoreCase(status)) {
+            throw new AccountDisabledException(
+                    "Your account is disabled. Please contact the admin.");
+        }
+        if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
+            verificationCodeService.createAndSend2FACode(user);
+            return Optional.of(LoginResponse.builder()
+                    .requiresTwoFactor(true)
+                    .user(toUserDto(user))
+                    .build());
+        }
+        String token = jwtService.generateToken(user.getUserId(), user.getEmail(), user.getRole());
+        String refreshToken = jwtService.generateRefreshToken(user.getUserId(), user.getEmail(), user.getRole());
+        return Optional.of(LoginResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .user(toUserDto(user))
+                .requiresTwoFactor(false)
+                .build());
     }
 
     @Transactional
@@ -129,25 +137,31 @@ public class AuthService {
             return Optional.empty();
         }
         return userRepository.findByEmail(request.getEmail().toLowerCase())
-                .flatMap(user -> verificationCodeRepository
-                        .findByUserAndVerificationCodeAndExpiresAtAfter(
-                                user, codeStr, Instant.now())
-                        .map(code -> {
-                            // One-time verification for customers and staff: after first successful verify, no more codes
-                            if ("customer".equalsIgnoreCase(user.getRole()) || "staff".equalsIgnoreCase(user.getRole()) || "assistant_admin".equalsIgnoreCase(user.getRole())) {
-                                user.setTwoFactorEnabled(false);
-                                userRepository.save(user);
-                            }
-                            verificationCodeRepository.delete(code);
-                            String token = jwtService.generateToken(user.getUserId(), user.getEmail(), user.getRole());
-                            String refreshToken = jwtService.generateRefreshToken(user.getUserId(), user.getEmail(), user.getRole());
-                            return LoginResponse.builder()
-                                    .token(token)
-                                    .refreshToken(refreshToken)
-                                    .user(toUserDto(user))
-                                    .requiresTwoFactor(false)
-                                    .build();
-                        }));
+                .flatMap(user -> {
+                    String status = user.getAccountStatus();
+                    if (status != null && !"active".equalsIgnoreCase(status)) {
+                        throw new AccountDisabledException("Your account is disabled. Please contact the admin.");
+                    }
+                    return verificationCodeRepository
+                            .findByUserAndVerificationCodeAndExpiresAtAfter(
+                                    user, codeStr, Instant.now())
+                            .map(code -> {
+                                // One-time verification for customers and staff: after first successful verify, no more codes
+                                if ("customer".equalsIgnoreCase(user.getRole()) || "staff".equalsIgnoreCase(user.getRole()) || "assistant_admin".equalsIgnoreCase(user.getRole())) {
+                                    user.setTwoFactorEnabled(false);
+                                    userRepository.save(user);
+                                }
+                                verificationCodeRepository.delete(code);
+                                String token = jwtService.generateToken(user.getUserId(), user.getEmail(), user.getRole());
+                                String refreshToken = jwtService.generateRefreshToken(user.getUserId(), user.getEmail(), user.getRole());
+                                return LoginResponse.builder()
+                                        .token(token)
+                                        .refreshToken(refreshToken)
+                                        .user(toUserDto(user))
+                                        .requiresTwoFactor(false)
+                                        .build();
+                            });
+                });
     }
 
     @Transactional(readOnly = true)
@@ -161,6 +175,7 @@ public class AuthService {
             String email = claims.get("email", String.class);
             String role = claims.get("role", String.class);
             return userRepository.findById(userId)
+                    .filter(user -> user.getAccountStatus() == null || "active".equalsIgnoreCase(user.getAccountStatus()))
                     .map(user -> {
                         String token = jwtService.generateToken(user.getUserId(), user.getEmail(), user.getRole());
                         String refreshToken = jwtService.generateRefreshToken(user.getUserId(), user.getEmail(), user.getRole());

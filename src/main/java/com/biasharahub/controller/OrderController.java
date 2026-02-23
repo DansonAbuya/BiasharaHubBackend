@@ -31,7 +31,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -168,14 +167,21 @@ public class OrderController {
         order.setTotalAmount(total);
         order = orderRepository.save(order);
 
-        // Notify seller when any product is now low stock (in-app, WhatsApp, SMS) – once per product
-        Set<UUID> lowStockNotified = new HashSet<>();
+        // Notify active sellers for products that are now low stock (in-app, WhatsApp, SMS)
+        Set<UUID> notifiedProductIds = new java.util.HashSet<>();
         for (OrderItem oi : order.getItems()) {
             Product p = oi.getProduct();
-            if (p != null && p.getQuantity() != null && p.getQuantity() <= LOW_STOCK_THRESHOLD && lowStockNotified.add(p.getProductId())) {
-                try { inAppNotificationService.notifySellerLowStock(p); } catch (Exception ignored) {}
-                try { whatsAppNotificationService.notifySellerLowStock(p); } catch (Exception ignored) {}
-                try { smsNotificationService.notifySellerLowStock(p); } catch (Exception ignored) {}
+            if (p != null && p.getQuantity() != null && p.getQuantity() <= LOW_STOCK_THRESHOLD
+                    && notifiedProductIds.add(p.getProductId())) {
+                try {
+                    inAppNotificationService.notifySellerLowStock(p);
+                } catch (Exception ignored) {}
+                try {
+                    whatsAppNotificationService.notifySellerLowStock(p);
+                } catch (Exception ignored) {}
+                try {
+                    smsNotificationService.notifySellerLowStock(p);
+                } catch (Exception ignored) {}
             }
         }
 
