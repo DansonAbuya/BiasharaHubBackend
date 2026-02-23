@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.biasharahub.entity.Payment;
 import com.biasharahub.entity.ServiceBookingEscrow;
 import com.biasharahub.entity.ServiceBookingPayment;
+import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.PaymentRepository;
 import com.biasharahub.repository.ServiceAppointmentRepository;
 import com.biasharahub.repository.ServiceBookingEscrowRepository;
@@ -38,6 +39,7 @@ import java.util.Optional;
 @Slf4j
 public class MpesaCallbackController {
 
+    private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final ServiceBookingPaymentRepository serviceBookingPaymentRepository;
     private final ServiceBookingEscrowRepository serviceBookingEscrowRepository;
@@ -81,6 +83,16 @@ public class MpesaCallbackController {
             tenantWalletService.recordIncomingPaymentForCurrentTenant(
                     amount, payment.getOrder().getOrderId().toString(), payment.getPaymentId().toString());
             orderEventPublisher.paymentCompleted(payment.getOrder().getOrderId(), payment.getPaymentId());
+            // Notify sellers synchronously so they receive payment-completed notifications
+            orderRepository.findByIdWithItems(payment.getOrder().getOrderId()).ifPresent(order -> {
+                try {
+                    inAppNotificationService.notifySellerPaymentCompleted(order);
+                    whatsAppNotificationService.notifySellerPaymentCompleted(order);
+                    smsNotificationService.notifySellerPaymentCompleted(order);
+                } catch (Exception e) {
+                    log.warn("Failed to send payment-completed notifications to seller for order {}: {}", order.getOrderId(), e.getMessage());
+                }
+            });
             return ResponseEntity.ok().build();
         }
 

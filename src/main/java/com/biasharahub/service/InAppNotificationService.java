@@ -208,10 +208,10 @@ public class InAppNotificationService {
         String title = "New service booking";
         String message = String.format("%s booked \"%s\" for %s. Confirm in the dashboard.", customerName, serviceName, dateTime);
         String actionUrl = "/dashboard/services";
-        List<User> ownerList = owners != null ? owners : Collections.emptyList();
-        List<User> staffList = staff != null ? staff : Collections.emptyList();
-        for (User u : ownerList) saveNotification(u, "service_booking", title, message, actionUrl);
-        for (User u : staffList) saveNotification(u, "service_booking", title, message, actionUrl);
+        Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+        Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+        Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                .forEach(u -> saveNotification(u, "service_booking", title, message, actionUrl));
     }
 
     /** Notify customer and provider that meeting link was sent (virtual service, booking confirmed). */
@@ -229,10 +229,10 @@ public class InAppNotificationService {
             List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
             String title = "Meeting link sent";
             String providerMsg = "Meeting link for \"" + serviceName + "\" with " + (appointment.getUser() != null && appointment.getUser().getName() != null ? appointment.getUser().getName() : "customer") + ": " + meetingLink;
-            List<User> ownerList = owners != null ? owners : Collections.emptyList();
-            List<User> staffList = staff != null ? staff : Collections.emptyList();
-            for (User u : ownerList) saveNotification(u, "service_booking", title, providerMsg, "/dashboard/services");
-            for (User u : staffList) saveNotification(u, "service_booking", title, providerMsg, "/dashboard/services");
+            Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+            Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+            Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                    .forEach(u -> saveNotification(u, "service_booking", title, providerMsg, "/dashboard/services"));
         }
     }
 
@@ -269,10 +269,10 @@ public class InAppNotificationService {
         String title = "Booking payment received";
         String message = String.format("Payment received for \"%s\" from %s. See appointment in dashboard.", serviceName, customerName);
         String actionUrl = "/dashboard/services";
-        List<User> ownerList = owners != null ? owners : Collections.emptyList();
-        List<User> staffList = staff != null ? staff : Collections.emptyList();
-        for (User u : ownerList) saveNotification(u, "payment", title, message, actionUrl);
-        for (User u : staffList) saveNotification(u, "payment", title, message, actionUrl);
+        Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+        Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+        Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                .forEach(u -> saveNotification(u, "payment", title, message, actionUrl));
     }
 
     public void notifyShipmentUpdated(Shipment shipment) {
