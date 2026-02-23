@@ -807,6 +807,30 @@ public class WhatsAppChatbotService {
         try {
             Order order = createOrderForCustomer(customer, product, qty, paymentMethod != null && "Cash".equalsIgnoreCase(paymentMethod) ? "Cash" : "M-Pesa");
             orderEventPublisher.orderCreated(order);
+            // Customer: in-app "order placed" notification (so it appears when order is via WhatsApp too)
+            try {
+                inAppNotificationService.notifyOrderCreated(order);
+            } catch (Exception e) {
+                log.warn("Failed to send in-app order-created notification to customer for WhatsApp order {}: {}", order.getOrderId(), e.getMessage());
+            }
+            // Notify sellers synchronously (same as app flow) so they receive order-created notifications when order is placed via WhatsApp
+            try {
+                inAppNotificationService.notifySellerOrderCreated(order);
+                whatsAppNotificationService.notifySellerOrderCreated(order);
+                smsNotificationService.notifySellerOrderCreated(order);
+            } catch (Exception e) {
+                log.warn("Failed to send order-created notifications to seller for WhatsApp order {}: {}", order.getOrderId(), e.getMessage());
+            }
+            // Low-stock alert if product is now at or below threshold
+            if (product.getQuantity() != null && product.getQuantity() <= 10) {
+                try {
+                    inAppNotificationService.notifySellerLowStock(product);
+                    whatsAppNotificationService.notifySellerLowStock(product);
+                    smsNotificationService.notifySellerLowStock(product);
+                } catch (Exception e) {
+                    log.warn("Failed to send low-stock notification for product {}: {}", product.getProductId(), e.getMessage());
+                }
+            }
             if ("Cash".equalsIgnoreCase(paymentMethod)) {
                 return "Order Confirmed! Order #" + order.getOrderNumber() + " – KES " + order.getTotalAmount()
                         + ". Pay in cash when you receive. The seller will confirm payment in the system. Reply ORDER to see your orders.";
