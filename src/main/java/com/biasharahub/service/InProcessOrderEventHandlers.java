@@ -35,8 +35,8 @@ public class InProcessOrderEventHandlers {
         try {
             log.info("In-process: order created orderId={}, orderNumber={}, customerId={}, total={}",
                     orderId, orderNumber, customerId, total);
-            // Send WhatsApp event for order confirmation (if integration enabled)
-            orderRepository.findById(orderId).ifPresent(order -> {
+            // Load order with items and products so seller notification can resolve businessId
+            orderRepository.findByIdWithItems(orderId).ifPresent(order -> {
                 try {
                     whatsAppNotificationService.notifyOrderCreated(order);
                 } catch (Exception e) {
@@ -118,8 +118,8 @@ public class InProcessOrderEventHandlers {
             } catch (Exception e) {
                 log.warn("Failed to create in-app payment-completed notification for order {}: {}", orderId, e.getMessage());
             }
-            // Notify active sellers (owner + staff) when payment is completed
-            orderRepository.findById(orderId).ifPresent(order -> {
+            // Notify active sellers (owner + staff) when payment is completed (load with items so businessId resolves)
+            orderRepository.findByIdWithItems(orderId).ifPresent(order -> {
                 try {
                     inAppNotificationService.notifySellerPaymentCompleted(order);
                 } catch (Exception e) {

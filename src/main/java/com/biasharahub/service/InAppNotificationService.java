@@ -64,8 +64,8 @@ public class InAppNotificationService {
         }
         java.util.UUID businessId = firstItem.getProduct().getBusinessId();
 
-        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
-        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
         if ((owners == null || owners.isEmpty()) && (staff == null || staff.isEmpty())) {
             return;
         }
@@ -110,8 +110,8 @@ public class InAppNotificationService {
         OrderItem firstItem = order.getItems().get(0);
         if (firstItem == null || firstItem.getProduct() == null || firstItem.getProduct().getBusinessId() == null) return;
         UUID businessId = firstItem.getProduct().getBusinessId();
-        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
-        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
         String title = "Order paid";
         String message = "Order " + order.getOrderNumber() + " has been paid. You can now prepare and dispatch.";
         String actionUrl = "/dashboard/orders";
@@ -125,8 +125,8 @@ public class InAppNotificationService {
     public void notifySellerLowStock(Product product) {
         if (product == null || product.getBusinessId() == null) return;
         int qty = product.getQuantity() != null ? product.getQuantity() : 0;
-        List<User> owners = userRepository.findByRoleAndBusinessId("owner", product.getBusinessId());
-        List<User> staff = userRepository.findByRoleAndBusinessId("staff", product.getBusinessId());
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", product.getBusinessId());
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", product.getBusinessId());
         String title = "Low stock alert";
         String message = "Product \"" + (product.getName() != null ? product.getName() : "Unknown") + "\" is running low (" + qty + " left). Consider restocking.";
         String actionUrl = "/dashboard/products";
@@ -142,8 +142,8 @@ public class InAppNotificationService {
         OrderItem firstItem = order.getItems().get(0);
         if (firstItem == null || firstItem.getProduct() == null || firstItem.getProduct().getBusinessId() == null) return;
         UUID businessId = firstItem.getProduct().getBusinessId();
-        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
-        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
         String title = "Dispute opened";
         String message = "A customer opened a dispute for order " + order.getOrderNumber() + (disputeType != null && !disputeType.isBlank() ? " (" + disputeType + ")." : ".");
         String actionUrl = "/dashboard/admin/disputes";
@@ -159,8 +159,8 @@ public class InAppNotificationService {
         OrderItem firstItem = order.getItems().get(0);
         if (firstItem == null || firstItem.getProduct() == null || firstItem.getProduct().getBusinessId() == null) return;
         UUID businessId = firstItem.getProduct().getBusinessId();
-        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
-        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
         String title = "Order cancelled";
         String message = "Order " + order.getOrderNumber() + " was cancelled. Inventory has been restored.";
         String actionUrl = "/dashboard/orders";
@@ -197,8 +197,8 @@ public class InAppNotificationService {
     public void notifyProviderServiceBookingCreated(ServiceAppointment appointment) {
         if (appointment == null || appointment.getService() == null || appointment.getService().getBusinessId() == null) return;
         UUID businessId = appointment.getService().getBusinessId();
-        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
-        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
         String customerName = appointment.getUser() != null && appointment.getUser().getName() != null
                 ? appointment.getUser().getName()
                 : (appointment.getUser() != null ? appointment.getUser().getEmail() : "a customer");
@@ -225,8 +225,8 @@ public class InAppNotificationService {
         }
         if (appointment.getService() != null && appointment.getService().getBusinessId() != null) {
             UUID businessId = appointment.getService().getBusinessId();
-            List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
-            List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+            List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", businessId);
+            List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
             String title = "Meeting link sent";
             String providerMsg = "Meeting link for \"" + serviceName + "\" with " + (appointment.getUser() != null && appointment.getUser().getName() != null ? appointment.getUser().getName() : "customer") + ": " + meetingLink;
             List<User> ownerList = owners != null ? owners : Collections.emptyList();
@@ -260,8 +260,8 @@ public class InAppNotificationService {
     public void notifyServiceBookingPaymentCompletedProvider(ServiceAppointment appointment) {
         if (appointment == null || appointment.getService() == null || appointment.getService().getBusinessId() == null) return;
         UUID businessId = appointment.getService().getBusinessId();
-        List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
-        List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", businessId);
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", businessId);
         String serviceName = appointment.getService().getName() != null ? appointment.getService().getName() : "service";
         String customerName = appointment.getUser() != null && appointment.getUser().getName() != null
                 ? appointment.getUser().getName()
