@@ -40,9 +40,10 @@ public class NotificationController {
         if (user == null) {
             return ResponseEntity.status(401).build();
         }
+        UUID userId = currentUser.userId();
         List<Notification> notifications = unreadOnly
-                ? notificationRepository.findByUserAndReadIsFalseOrderByCreatedAtDesc(user)
-                : notificationRepository.findByUserOrderByCreatedAtDesc(user);
+                ? notificationRepository.findByUser_UserIdAndReadIsFalseOrderByCreatedAtDesc(userId)
+                : notificationRepository.findByUser_UserIdOrderByCreatedAtDesc(userId);
         List<NotificationDto> dtoList = notifications.stream().map(NotificationController::toDto).collect(Collectors.toList());
         return ResponseEntity.ok(dtoList);
     }
@@ -81,7 +82,7 @@ public class NotificationController {
         if (user == null) {
             return ResponseEntity.status(401).build();
         }
-        List<Notification> unread = notificationRepository.findByUserAndReadIsFalseOrderByCreatedAtDesc(user);
+        List<Notification> unread = notificationRepository.findByUser_UserIdAndReadIsFalseOrderByCreatedAtDesc(currentUser.userId());
         if (!unread.isEmpty()) {
             Instant now = Instant.now();
             for (Notification n : unread) {

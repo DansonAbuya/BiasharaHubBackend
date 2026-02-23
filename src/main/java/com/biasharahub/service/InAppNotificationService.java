@@ -324,9 +324,13 @@ public class InAppNotificationService {
     }
 
     private void saveNotification(User user, String type, String title, String message, String actionUrl) {
+        if (user == null || user.getUserId() == null) return;
+        UUID userId = user.getUserId();
         try {
+            // Use getReferenceById so the reference is always in the current persistence context (avoids detached entity issues)
+            User ref = userRepository.getReferenceById(userId);
             Notification notif = Notification.builder()
-                    .user(user)
+                    .user(ref)
                     .type(type)
                     .title(title)
                     .message(message)
@@ -334,8 +338,9 @@ public class InAppNotificationService {
                     .read(false)
                     .build();
             notificationRepository.save(notif);
+            notificationRepository.flush();
         } catch (Exception e) {
-            log.warn("Failed to save in-app notification for user {}: {}", user.getUserId(), e.getMessage());
+            log.warn("Failed to save in-app notification for user {}: {} - {}", userId, e.getClass().getSimpleName(), e.getMessage());
         }
     }
 }
