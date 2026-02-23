@@ -42,6 +42,7 @@ public class SellerConfigController {
                 .businessName(u.getBusinessName())
                 .sellerTier(u.getSellerTier())
                 .verificationStatus(u.getVerificationStatus())
+                .accountStatus(u.getAccountStatus())
                 .pricingPlan(u.getPricingPlan())
                 .growthInventoryAutomation(u.getGrowthInventoryAutomation())
                 .growthWhatsappEnabled(u.getGrowthWhatsappEnabled())

@@ -55,7 +55,7 @@ public class ProductController {
             key = "T(com.biasharahub.config.TenantContext).getTenantSchema()"
     )
     public List<BusinessDto> listBusinesses() {
-        List<BusinessDto> businesses = userRepository.findByRoleIgnoreCaseAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified")
+        List<BusinessDto> businesses = userRepository.findActiveOwnersByRoleAndVerificationStatusAndBusinessIdIsNotNullOrderByBusinessNameAsc("owner", "verified")
                 .stream()
                 .filter(u -> u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus()))
                 .map(u -> BusinessDto.builder()
@@ -253,12 +253,17 @@ public class ProductController {
                     if (dto.getDescription() != null) product.setDescription(dto.getDescription());
                     if (dto.getImages() != null) attachImages(product, dto.getImages(), dto.getImage());
                     product = productRepository.save(product);
-                    // Notify seller when stock is low (in-app, WhatsApp, SMS)
-                    Integer qty = product.getQuantity();
-                    if (qty != null && qty <= LOW_STOCK_THRESHOLD) {
-                        try { inAppNotificationService.notifySellerLowStock(product); } catch (Exception ignored) {}
-                        try { whatsAppNotificationService.notifySellerLowStock(product); } catch (Exception ignored) {}
-                        try { smsNotificationService.notifySellerLowStock(product); } catch (Exception ignored) {}
+                    // Notify active sellers when quantity is at or below threshold (in-app, WhatsApp, SMS)
+                    if (product.getQuantity() != null && product.getQuantity() <= LOW_STOCK_THRESHOLD) {
+                        try {
+                            inAppNotificationService.notifySellerLowStock(product);
+                        } catch (Exception ignored) {}
+                        try {
+                            whatsAppNotificationService.notifySellerLowStock(product);
+                        } catch (Exception ignored) {}
+                        try {
+                            smsNotificationService.notifySellerLowStock(product);
+                        } catch (Exception ignored) {}
                     }
                     return ResponseEntity.ok(toDto(product));
                 })

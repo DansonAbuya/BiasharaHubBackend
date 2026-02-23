@@ -13,15 +13,18 @@ import com.biasharahub.entity.User;
 import com.biasharahub.repository.TenantRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class UserService {
 
     private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
@@ -34,13 +37,22 @@ public class UserService {
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final MailService mailService;
+    private final InAppNotificationService inAppNotificationService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
+    private final SmsNotificationService smsNotificationService;
 
     public UserService(UserRepository userRepository, TenantRepository tenantRepository,
-                       PasswordEncoder passwordEncoder, MailService mailService) {
+                       PasswordEncoder passwordEncoder, MailService mailService,
+                       InAppNotificationService inAppNotificationService,
+                       WhatsAppNotificationService whatsAppNotificationService,
+                       SmsNotificationService smsNotificationService) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailService = mailService;
+        this.inAppNotificationService = inAppNotificationService;
+        this.whatsAppNotificationService = whatsAppNotificationService;
+        this.smsNotificationService = smsNotificationService;
     }
 
     /**
@@ -336,6 +348,49 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Admin: set account status for an owner (product seller or service provider).
+     * "active" = can log in and appear in marketplace; "disabled" = cannot log in, not shown to customers.
+     */
+    @Transactional
+    public UserDto setOwnerAccountStatus(UUID userId, String status) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (!"owner".equalsIgnoreCase(user.getRole())) {
+            throw new IllegalArgumentException("Only owner accounts can be disabled or enabled. User role: " + user.getRole());
+        }
+        String normalized = status == null ? null : status.trim().toLowerCase();
+        if ("active".equals(normalized)) {
+            user.setAccountStatus("active");
+        } else if ("disabled".equals(normalized)) {
+            user.setAccountStatus("disabled");
+        } else {
+            throw new IllegalArgumentException("Status must be 'active' or 'disabled'");
+        }
+        user = userRepository.save(user);
+
+        // Notify owner when account is disabled (in-app, WhatsApp, SMS)
+        if ("disabled".equals(normalized)) {
+            try {
+                inAppNotificationService.notifyAccountSuspended(user);
+            } catch (Exception e) {
+                log.warn("Failed to send in-app account-suspended notification to user {}: {}", userId, e.getMessage());
+            }
+            try {
+                whatsAppNotificationService.notifyAccountSuspended(user);
+            } catch (Exception e) {
+                log.warn("Failed to send WhatsApp account-suspended notification to user {}: {}", userId, e.getMessage());
+            }
+            try {
+                smsNotificationService.notifyAccountSuspended(user);
+            } catch (Exception e) {
+                log.warn("Failed to send SMS account-suspended notification to user {}: {}", userId, e.getMessage());
+            }
+        }
+
+        return toUserDto(user);
+    }
+
     private UserDto toUserDto(User user) {
         return UserDto.builder()
                 .id(user.getUserId())
@@ -351,6 +406,8 @@ public class UserService {
                 .verificationNotes(user.getVerificationNotes())
                 .sellerTier(user.getSellerTier())
                 .applyingForTier(user.getApplyingForTier())
+                .strikeCount(user.getStrikeCount())
+                .accountStatus(user.getAccountStatus())
                 // Service provider fields
                 .serviceProviderStatus(user.getServiceProviderStatus())
                 .serviceDeliveryType(user.getServiceDeliveryType())

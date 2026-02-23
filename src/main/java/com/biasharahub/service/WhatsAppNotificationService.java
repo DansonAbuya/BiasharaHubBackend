@@ -71,13 +71,16 @@ public class WhatsAppNotificationService {
         return first.getProduct().getBusinessId();
     }
 
+    /** Returns owners and staff for the business who have an active account (receive notifications). */
     private List<User> getSellerUsers(UUID businessId) {
         List<User> out = new ArrayList<>();
         List<User> owners = userRepository.findByRoleAndBusinessId("owner", businessId);
         List<User> staff = userRepository.findByRoleAndBusinessId("staff", businessId);
         if (owners != null) out.addAll(owners);
         if (staff != null) out.addAll(staff);
-        return out;
+        return out.stream()
+                .filter(u -> u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus()))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public void notifyPaymentRequested(Order order, Payment payment) {
@@ -254,6 +257,15 @@ public class WhatsAppNotificationService {
                 client.sendMessage(u.getPhone(), body);
             }
         }
+    }
+
+    /** Notify owner when their account is suspended/disabled by admin. */
+    public void notifyAccountSuspended(User user) {
+        if (user == null) return;
+        String phone = user.getPhone();
+        if (phone == null || phone.isBlank()) return;
+        String body = "BiasharaHub: Your account has been disabled. You cannot log in or receive orders. Please contact the admin to resolve.";
+        client.sendMessage(phone, body);
     }
 
     public void notifyShipmentUpdated(Shipment shipment) {

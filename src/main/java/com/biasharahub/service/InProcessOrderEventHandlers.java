@@ -47,21 +47,21 @@ public class InProcessOrderEventHandlers {
                 } catch (Exception e) {
                     log.warn("Failed to create in-app order-created notification for {}: {}", orderId, e.getMessage());
                 }
-                // Notify seller (owner + staff): in-app, WhatsApp, SMS
+                // Notify active sellers (owner + staff) – in-app, WhatsApp, SMS
                 try {
                     inAppNotificationService.notifySellerOrderCreated(order);
                 } catch (Exception e) {
-                    log.warn("Failed to create in-app seller order notification for {}: {}", orderId, e.getMessage());
+                    log.warn("Failed to notify seller order-created (in-app) for {}: {}", orderId, e.getMessage());
                 }
                 try {
                     whatsAppNotificationService.notifySellerOrderCreated(order);
                 } catch (Exception e) {
-                    log.warn("Failed to send WhatsApp seller order notification for {}: {}", orderId, e.getMessage());
+                    log.warn("Failed to notify seller order-created (WhatsApp) for {}: {}", orderId, e.getMessage());
                 }
                 try {
                     smsNotificationService.notifySellerOrderCreated(order);
                 } catch (Exception e) {
-                    log.warn("Failed to send SMS seller order notification for {}: {}", orderId, e.getMessage());
+                    log.warn("Failed to notify seller order-created (SMS) for {}: {}", orderId, e.getMessage());
                 }
             });
         } catch (Exception e) {
@@ -118,23 +118,22 @@ public class InProcessOrderEventHandlers {
             } catch (Exception e) {
                 log.warn("Failed to create in-app payment-completed notification for order {}: {}", orderId, e.getMessage());
             }
-
-            // Notify seller (owner + staff): in-app, WhatsApp, SMS – order must have items loaded
-            orderRepository.findByIdWithItems(orderId).ifPresent(order -> {
+            // Notify active sellers (owner + staff) when payment is completed
+            orderRepository.findById(orderId).ifPresent(order -> {
                 try {
                     inAppNotificationService.notifySellerPaymentCompleted(order);
                 } catch (Exception e) {
-                    log.warn("Failed to create in-app seller payment-completed notification for {}: {}", orderId, e.getMessage());
+                    log.warn("Failed to notify seller payment-completed (in-app) for order {}: {}", orderId, e.getMessage());
                 }
                 try {
                     whatsAppNotificationService.notifySellerPaymentCompleted(order);
                 } catch (Exception e) {
-                    log.warn("Failed to send WhatsApp seller payment-completed notification for {}: {}", orderId, e.getMessage());
+                    log.warn("Failed to notify seller payment-completed (WhatsApp) for order {}: {}", orderId, e.getMessage());
                 }
                 try {
                     smsNotificationService.notifySellerPaymentCompleted(order);
                 } catch (Exception e) {
-                    log.warn("Failed to send SMS seller payment-completed notification for {}: {}", orderId, e.getMessage());
+                    log.warn("Failed to notify seller payment-completed (SMS) for order {}: {}", orderId, e.getMessage());
                 }
             });
         } catch (Exception e) {

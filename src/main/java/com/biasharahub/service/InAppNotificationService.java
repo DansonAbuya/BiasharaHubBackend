@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * In-app/platform notifications persisted to the tenant database so users can view notifications
@@ -34,6 +35,11 @@ public class InAppNotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
+
+    /** Only active accounts (owner/staff) receive seller notifications. */
+    private static boolean isActive(User u) {
+        return u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus());
+    }
 
     public void notifyOrderCreated(Order order) {
         User customer = order.getUser();
@@ -72,14 +78,10 @@ public class InAppNotificationService {
                 + " from " + customerName + ".";
         String actionUrl = "/dashboard/orders";
 
-        List<User> ownerList = owners != null ? owners : Collections.emptyList();
-        List<User> staffList = staff != null ? staff : Collections.emptyList();
-        for (User u : ownerList) {
-            saveNotification(u, "order", title, message, actionUrl);
-        }
-        for (User u : staffList) {
-            saveNotification(u, "order", title, message, actionUrl);
-        }
+        Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+        Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+        Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                .forEach(u -> saveNotification(u, "order", title, message, actionUrl));
     }
 
     public void notifyPaymentRequested(Order order, Payment payment) {
@@ -113,10 +115,10 @@ public class InAppNotificationService {
         String title = "Order paid";
         String message = "Order " + order.getOrderNumber() + " has been paid. You can now prepare and dispatch.";
         String actionUrl = "/dashboard/orders";
-        List<User> ownerList = owners != null ? owners : Collections.emptyList();
-        List<User> staffList = staff != null ? staff : Collections.emptyList();
-        for (User u : ownerList) saveNotification(u, "payment", title, message, actionUrl);
-        for (User u : staffList) saveNotification(u, "payment", title, message, actionUrl);
+        Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+        Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+        Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                .forEach(u -> saveNotification(u, "payment", title, message, actionUrl));
     }
 
     /** Notify seller when product stock is running low (e.g. <= 10). */
@@ -128,10 +130,10 @@ public class InAppNotificationService {
         String title = "Low stock alert";
         String message = "Product \"" + (product.getName() != null ? product.getName() : "Unknown") + "\" is running low (" + qty + " left). Consider restocking.";
         String actionUrl = "/dashboard/products";
-        List<User> ownerList = owners != null ? owners : Collections.emptyList();
-        List<User> staffList = staff != null ? staff : Collections.emptyList();
-        for (User u : ownerList) saveNotification(u, "stock", title, message, actionUrl);
-        for (User u : staffList) saveNotification(u, "stock", title, message, actionUrl);
+        Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+        Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+        Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                .forEach(u -> saveNotification(u, "stock", title, message, actionUrl));
     }
 
     /** Notify seller when a customer opens a dispute on an order. */
@@ -145,10 +147,10 @@ public class InAppNotificationService {
         String title = "Dispute opened";
         String message = "A customer opened a dispute for order " + order.getOrderNumber() + (disputeType != null && !disputeType.isBlank() ? " (" + disputeType + ")." : ".");
         String actionUrl = "/dashboard/admin/disputes";
-        List<User> ownerList = owners != null ? owners : Collections.emptyList();
-        List<User> staffList = staff != null ? staff : Collections.emptyList();
-        for (User u : ownerList) saveNotification(u, "dispute", title, message, actionUrl);
-        for (User u : staffList) saveNotification(u, "dispute", title, message, actionUrl);
+        Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+        Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+        Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                .forEach(u -> saveNotification(u, "dispute", title, message, actionUrl));
     }
 
     /** Notify seller when an order is cancelled. */
@@ -162,10 +164,19 @@ public class InAppNotificationService {
         String title = "Order cancelled";
         String message = "Order " + order.getOrderNumber() + " was cancelled. Inventory has been restored.";
         String actionUrl = "/dashboard/orders";
-        List<User> ownerList = owners != null ? owners : Collections.emptyList();
-        List<User> staffList = staff != null ? staff : Collections.emptyList();
-        for (User u : ownerList) saveNotification(u, "order", title, message, actionUrl);
-        for (User u : staffList) saveNotification(u, "order", title, message, actionUrl);
+        Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+        Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+        Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                .forEach(u -> saveNotification(u, "order", title, message, actionUrl));
+    }
+
+    /** Notify owner when their account is suspended/disabled by admin. */
+    public void notifyAccountSuspended(User user) {
+        if (user == null) return;
+        saveNotification(user, "account",
+                "Account disabled",
+                "Your account has been disabled. You cannot log in or receive orders. Please contact the admin to resolve.",
+                "/dashboard");
     }
 
     // ---------- Service bookings (BiasharaHub Services) ----------
