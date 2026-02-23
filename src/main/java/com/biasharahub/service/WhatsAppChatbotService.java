@@ -72,6 +72,7 @@ public class WhatsAppChatbotService {
     private final ServiceBookingPaymentRepository serviceBookingPaymentRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final InAppNotificationService inAppNotificationService;
+    private final SmsNotificationService smsNotificationService;
 
     @Value("${app.storefront-url:https://biasharahub-app.sysnovatechnologies.com}")
     private String storefrontUrl;
@@ -1555,11 +1556,13 @@ public class WhatsAppChatbotService {
                     .build();
             serviceBookingPaymentRepository.save(payment);
 
-            // Send notifications
+            // Send notifications (customer + provider: in-app, WhatsApp, SMS)
             try {
                 inAppNotificationService.notifyServiceBookingCreated(appointment);
                 inAppNotificationService.notifyProviderServiceBookingCreated(appointment);
+                whatsAppNotificationService.notifyServiceBookingCreated(appointment);
                 whatsAppNotificationService.notifyProviderServiceBookingCreated(appointment);
+                smsNotificationService.notifyProviderServiceBookingCreated(appointment);
             } catch (Exception ex) {
                 log.warn("Failed to send service booking notifications: {}", ex.getMessage());
             }

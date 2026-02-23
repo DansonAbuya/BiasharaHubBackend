@@ -23,6 +23,7 @@ import com.biasharahub.service.SmsNotificationService;
 import com.biasharahub.service.WhatsAppNotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,6 +40,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/orders")
 @RequiredArgsConstructor
+@Slf4j
 public class OrderController {
 
     /** Low-stock threshold for seller alerts when stock drops after order. */
@@ -197,6 +199,23 @@ public class OrderController {
         paymentRepository.save(payment);
 
         orderEventPublisher.orderCreated(order);
+
+        // Notify sellers synchronously (same request) so they always receive order-created notifications
+        try {
+            inAppNotificationService.notifySellerOrderCreated(order);
+        } catch (Exception e) {
+            log.warn("Failed to send in-app order-created notification to seller for order {}: {}", order.getOrderId(), e.getMessage());
+        }
+        try {
+            whatsAppNotificationService.notifySellerOrderCreated(order);
+        } catch (Exception e) {
+            log.warn("Failed to send WhatsApp order-created notification to seller for order {}: {}", order.getOrderId(), e.getMessage());
+        }
+        try {
+            smsNotificationService.notifySellerOrderCreated(order);
+        } catch (Exception e) {
+            log.warn("Failed to send SMS order-created notification to seller for order {}: {}", order.getOrderId(), e.getMessage());
+        }
 
         return ResponseEntity.ok(toDto(order));
     }
