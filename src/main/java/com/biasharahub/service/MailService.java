@@ -349,6 +349,65 @@ public class MailService {
         send(toEmail, "Update on your service provider application", text);
     }
 
+    /**
+     * Notify product seller (owner) that we have received their verification documents.
+     * Sent when they submit for review; asks them to check email for approval/rejection.
+     */
+    public void sendProductSellerDocumentsReceived(@NonNull String toEmail, @NonNull String name, String businessName) {
+        String bizInfo = businessName != null && !businessName.isBlank() ? " for \"" + businessName + "\"" : "";
+        String text = """
+                Hi %s,
+
+                We have received your product seller verification documents%s.
+
+                Our team will review your application and get back to you by email with the outcome (approved or any feedback). Please check your email for updates.
+
+                If you have any questions in the meantime, contact us at biasharahub@sysnovatechnologies.com or WhatsApp 0703520023.
+
+                Thank you for using BiasharaHub.
+                """.formatted(name, bizInfo);
+        send(toEmail, "We have received your verification documents – BiasharaHub", text);
+    }
+
+    /**
+     * Notify product seller (owner) their business verification has been approved.
+     */
+    public void sendProductSellerVerificationApproved(@NonNull String toEmail, @NonNull String name, String businessName) {
+        String bizInfo = businessName != null && !businessName.isBlank() ? " for \"" + businessName + "\"" : "";
+        String text = """
+                Hi %s,
+
+                Great news! Your product seller verification%s has been approved.
+
+                You can now log in to your BiasharaHub dashboard and add your products. Your shop will be visible to customers.
+
+                If you have any questions, contact us at biasharahub@sysnovatechnologies.com or WhatsApp 0703520023.
+
+                Thank you for using BiasharaHub.
+                """.formatted(name, bizInfo);
+        send(toEmail, "Your business verification is approved – BiasharaHub", text);
+    }
+
+    /**
+     * Notify product seller (owner) their business verification has been rejected.
+     */
+    public void sendProductSellerVerificationRejected(@NonNull String toEmail, @NonNull String name, String businessName, String reason) {
+        String bizInfo = businessName != null && !businessName.isBlank() ? " for \"" + businessName + "\"" : "";
+        String reasonInfo = reason != null && !reason.isBlank() ? "\n\nReason: " + reason : "";
+        String text = """
+                Hi %s,
+
+                We regret to inform you that your product seller verification%s has not been approved at this time.%s
+
+                You can log in to your BiasharaHub dashboard, update your documents under Verification, and submit again for review.
+
+                If you have questions, contact us at biasharahub@sysnovatechnologies.com or WhatsApp 0703520023.
+
+                Thank you for your interest in BiasharaHub.
+                """.formatted(name, bizInfo, reasonInfo);
+        send(toEmail, "Update on your business verification – BiasharaHub", text);
+    }
+
     private void sendSafe(EmailMessage message, String description, String toEmail) {
         try {
             emailSender.send(message);

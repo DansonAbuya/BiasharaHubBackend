@@ -388,6 +388,25 @@ public class UserService {
             }
         }
 
+        // Notify owner when account is enabled (in-app, WhatsApp, SMS)
+        if ("active".equals(normalized)) {
+            try {
+                inAppNotificationService.notifyAccountEnabled(user);
+            } catch (Exception e) {
+                log.warn("Failed to send in-app account-enabled notification to user {}: {}", userId, e.getMessage());
+            }
+            try {
+                whatsAppNotificationService.notifyAccountEnabled(user);
+            } catch (Exception e) {
+                log.warn("Failed to send WhatsApp account-enabled notification to user {}: {}", userId, e.getMessage());
+            }
+            try {
+                smsNotificationService.notifyAccountEnabled(user);
+            } catch (Exception e) {
+                log.warn("Failed to send SMS account-enabled notification to user {}: {}", userId, e.getMessage());
+            }
+        }
+
         return toUserDto(user);
     }
 

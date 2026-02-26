@@ -22,6 +22,12 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("SELECT DISTINCT o FROM Order o JOIN o.items i JOIN i.product p WHERE p.businessId = :businessId ORDER BY o.orderedAt DESC")
     List<Order> findOrdersContainingProductsByBusinessId(UUID businessId);
 
+    @Query("SELECT COUNT(DISTINCT o) FROM Order o JOIN o.items i JOIN i.product p WHERE p.businessId = :businessId")
+    long countOrdersContainingProductsByBusinessId(@Param("businessId") UUID businessId);
+
+    @Query("SELECT COUNT(DISTINCT o) FROM Order o JOIN o.items i JOIN i.product p WHERE p.businessId = :businessId AND o.orderStatus = 'pending'")
+    long countPendingOrdersByBusinessId(@Param("businessId") UUID businessId);
+
     Optional<Order> findByOrderNumber(String orderNumber);
 
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.orderStatus = 'delivered'")

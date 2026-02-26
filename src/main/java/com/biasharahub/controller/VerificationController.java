@@ -98,6 +98,17 @@ public class VerificationController {
         return ResponseEntity.ok(verificationService.getMyVerificationStatus(user));
     }
 
+    /**
+     * Owner: submit verification documents for review. Sends "documents received" email.
+     * Client should show "Check your email for your application status" and then log the user out and redirect to home.
+     */
+    @PostMapping("/submit")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<Map<String, String>> submitForReview(@AuthenticationPrincipal AuthenticatedUser user) {
+        verificationService.submitForReview(user);
+        return ResponseEntity.ok(Map.of("message", "Documents submitted for review. Check your email for your application status."));
+    }
+
     @GetMapping("/checklist")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<VerificationChecklistDto> getMyChecklist(@AuthenticationPrincipal AuthenticatedUser user) {

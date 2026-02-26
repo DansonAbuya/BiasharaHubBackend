@@ -179,6 +179,15 @@ public class InAppNotificationService {
                 "/dashboard");
     }
 
+    /** Notify owner when their account has been re-enabled by admin. */
+    public void notifyAccountEnabled(User user) {
+        if (user == null) return;
+        saveNotification(user, "account",
+                "Account enabled",
+                "Your account has been enabled. You can log in again and receive orders.",
+                "/dashboard");
+    }
+
     // ---------- Service bookings (BiasharaHub Services) ----------
 
     /** Notify customer that their service appointment was booked. */

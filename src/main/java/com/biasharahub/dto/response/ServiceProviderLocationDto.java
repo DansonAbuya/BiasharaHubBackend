@@ -29,4 +29,9 @@ public class ServiceProviderLocationDto {
     private UUID serviceCategoryId;
     private String serviceCategoryName;
     private int serviceCount;
+    /**
+     * Public URL to this service provider's profile on the frontend
+     * (e.g. https://app.example.com/providers/{businessId}) so they can share it with customers.
+     */
+    private String publicProfileUrl;
 }
