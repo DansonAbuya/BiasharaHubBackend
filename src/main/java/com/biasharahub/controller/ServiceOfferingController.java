@@ -32,6 +32,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -70,6 +71,9 @@ public class ServiceOfferingController {
 
     @Autowired(required = false)
     private R2StorageService r2StorageService;
+
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     /**
      * Whether the current user can offer services. Uses service provider verification (separate from product seller verification).
@@ -183,9 +187,22 @@ public class ServiceOfferingController {
                             .serviceCategoryId(u.getServiceProviderCategoryId())
                             .serviceCategoryName(categoryName)
                             .serviceCount(serviceCount)
+                            .publicProfileUrl(buildServiceProviderUrl(u.getBusinessId()))
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    /** Build public profile URL for a service provider using configured frontend base URL. */
+    private String buildServiceProviderUrl(UUID businessId) {
+        if (businessId == null) {
+            return null;
+        }
+        String base = frontendUrl != null ? frontendUrl.trim() : "http://localhost:3000";
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base + "/providers/" + businessId;
     }
 
     /**

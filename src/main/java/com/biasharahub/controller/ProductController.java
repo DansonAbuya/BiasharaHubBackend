@@ -17,6 +17,7 @@ import com.biasharahub.service.SmsNotificationService;
 import com.biasharahub.service.WhatsAppNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +49,9 @@ public class ProductController {
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final SmsNotificationService smsNotificationService;
 
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
+
     /** List shops (verified owners’ businesses) for marketplace. Each seller has one shop; only verified shops appear. No auth required. */
     @GetMapping("/businesses")
     @Cacheable(
@@ -63,9 +67,22 @@ public class ProductController {
                         .name(u.getBusinessName() != null ? u.getBusinessName() : "—")
                         .ownerName(u.getName() != null ? u.getName() : u.getEmail())
                         .sellerTier(u.getSellerTier() != null ? u.getSellerTier() : "tier1")
+                        .shopUrl(buildShopUrl(u.getBusinessId()))
                         .build())
                 .collect(Collectors.toList());
         return businesses;
+    }
+
+    /** Build public shop URL for a business using configured frontend base URL. */
+    private String buildShopUrl(UUID businessId) {
+        if (businessId == null) {
+            return null;
+        }
+        String base = frontendUrl != null ? frontendUrl.trim() : "http://localhost:3000";
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base + "/shops/" + businessId;
     }
 
     /** List product categories for frontend dropdown (e.g. when uploading/creating a product). No auth required. */
