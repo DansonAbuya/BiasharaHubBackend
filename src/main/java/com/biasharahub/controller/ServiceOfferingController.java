@@ -41,6 +41,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -193,7 +194,9 @@ public class ServiceOfferingController {
                 .collect(Collectors.toList());
     }
 
-    /** Build public profile URL for a service provider using configured frontend base URL. */
+    /** Build public profile URL for a service provider using configured frontend base URL.
+     * Uses an encoded business identifier in the URL so the raw UUID is not exposed.
+     */
     private String buildServiceProviderUrl(UUID businessId) {
         if (businessId == null) {
             return null;
@@ -202,7 +205,16 @@ public class ServiceOfferingController {
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
-        return base + "/providers/" + businessId;
+        String token = encodeBusinessId(businessId);
+        return base + "/services?provider=" + token;
+    }
+
+    /** Encode business UUID into an opaque, URL-safe token. */
+    private String encodeBusinessId(UUID businessId) {
+        String raw = businessId.toString();
+        return java.util.Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
