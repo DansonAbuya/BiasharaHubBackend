@@ -26,6 +26,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,7 +74,9 @@ public class ProductController {
         return businesses;
     }
 
-    /** Build public shop URL for a business using configured frontend base URL. */
+    /** Build public shop URL for a business using configured frontend base URL.
+     * Uses an encoded business identifier in the URL so the raw UUID is not exposed.
+     */
     private String buildShopUrl(UUID businessId) {
         if (businessId == null) {
             return null;
@@ -82,7 +85,16 @@ public class ProductController {
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
-        return base + "/shops/" + businessId;
+        String token = encodeBusinessId(businessId);
+        return base + "/shop?shop=" + token;
+    }
+
+    /** Encode business UUID into an opaque, URL-safe token. */
+    private String encodeBusinessId(UUID businessId) {
+        String raw = businessId.toString();
+        return java.util.Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     /** List product categories for frontend dropdown (e.g. when uploading/creating a product). No auth required. */
