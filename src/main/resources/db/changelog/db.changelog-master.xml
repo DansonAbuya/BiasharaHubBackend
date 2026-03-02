@@ -57,5 +57,10 @@
     <include file="db/changelog/changes/050-service-appointment-customer-location.xml"/>
     <include file="db/changelog/changes/051-online-delivery-methods.xml"/>
     <include file="db/changelog/changes/052-service-offering-media.xml"/>
+    <include file="db/changelog/changes/053-tenant-suppliers-and-stock-ledger.sql"/>
+    <include file="db/changelog/changes/054-add-suppliers-and-stock-ledger-to-create-tenant-schema.sql"/>
+    <include file="db/changelog/changes/055-allow-supplier-role-in-existing-tenants.sql"/>
+    <include file="db/changelog/changes/056-add-processing-status-to-supplier-deliveries.sql"/>
+    <include file="db/changelog/changes/057-supplier-dispatched-and-received-quantity.sql"/>
 
 </databaseChangeLog>

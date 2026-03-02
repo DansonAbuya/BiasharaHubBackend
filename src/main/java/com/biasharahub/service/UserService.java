@@ -290,6 +290,41 @@ public class UserService {
     }
 
     /**
+     * Owner adds a supplier user account (linked to an existing Supplier record).
+     * Temporary password is generated and sent by email.
+     */
+    @Transactional
+    public UserDto addSupplierUser(User owner, com.biasharahub.entity.Supplier supplier) {
+        if (owner == null || !"owner".equalsIgnoreCase(owner.getRole())) {
+            throw new IllegalArgumentException("Only owners can add suppliers");
+        }
+        if (owner.getBusinessId() == null || owner.getBusinessName() == null) {
+            throw new IllegalArgumentException("Owner business is not set");
+        }
+        String email = supplier.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Supplier email is required to create a login account");
+        }
+        String normalisedEmail = email.toLowerCase();
+        if (userRepository.existsByEmail(normalisedEmail)) {
+            throw new IllegalArgumentException("Email already registered");
+        }
+        String tempPassword = generateTemporaryPassword();
+        User supplierUser = User.builder()
+                .email(normalisedEmail)
+                .passwordHash(passwordEncoder.encode(tempPassword))
+                .name(supplier.getName())
+                .role("supplier")
+                .twoFactorEnabled(false)
+                .businessId(owner.getBusinessId())
+                .businessName(owner.getBusinessName())
+                .build();
+        supplierUser = userRepository.save(supplierUser);
+        mailService.sendWelcomeSupplier(supplierUser.getEmail(), supplierUser.getName(), owner.getBusinessName(), tempPassword);
+        return toUserDto(supplierUser);
+    }
+
+    /**
      * Platform admin adds an assistant admin. Temporary password is generated and sent by email.
      * 2FA is always on for assistant admins and cannot be disabled.
      */

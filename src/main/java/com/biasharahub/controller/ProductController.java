@@ -9,12 +9,14 @@ import com.biasharahub.entity.Product;
 import com.biasharahub.entity.User;
 import com.biasharahub.repository.ProductCategoryRepository;
 import com.biasharahub.repository.ProductRepository;
+import com.biasharahub.repository.SupplierDeliveryItemRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.InAppNotificationService;
 import com.biasharahub.service.R2StorageService;
 import com.biasharahub.service.SmsNotificationService;
 import com.biasharahub.service.WhatsAppNotificationService;
+import com.biasharahub.service.StockLedgerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +28,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -44,11 +48,13 @@ public class ProductController {
 
     private final ProductRepository productRepository;
     private final ProductCategoryRepository productCategoryRepository;
+    private final SupplierDeliveryItemRepository supplierDeliveryItemRepository;
     private final UserRepository userRepository;
     private final Optional<R2StorageService> r2StorageService;
     private final InAppNotificationService inAppNotificationService;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final SmsNotificationService smsNotificationService;
+    private final StockLedgerService stockLedgerService;
 
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
@@ -135,8 +141,8 @@ public class ProductController {
         List<Product> products;
         Set<UUID> businessIds;
 
-        if (isOwnerOrStaff(currentUser)) {
-            // Seller Center: owner/staff see only their business's products (including pending/rejected)
+        if (canListBusinessProducts(currentUser)) {
+            // Seller Center / Supplier: owner/staff/supplier see business's products (supplier needs for dispatch)
             UUID myBusinessId = getBusinessId(currentUser);
             if (myBusinessId == null) {
                 products = List.of();
@@ -171,7 +177,13 @@ public class ProductController {
                             && "approved".equalsIgnoreCase(p.getModerationStatus()))
                     .toList();
         }
-        return products.stream().map(this::toDto).collect(Collectors.toList());
+        List<UUID> productIds = products.stream().map(Product::getProductId).toList();
+        java.util.Map<UUID, Integer> processingByProduct = productIds.isEmpty() ? java.util.Map.of()
+                : supplierDeliveryItemRepository.sumProcessingQuantityByProductIds(productIds).stream()
+                        .collect(Collectors.toMap(row -> (UUID) row[0], row -> ((Number) row[1]).intValue()));
+        return products.stream()
+                .map(p -> toDto(p, processingByProduct.getOrDefault(p.getProductId(), 0)))
+                .collect(Collectors.toList());
     }
 
     /** Resolve businessId, businessName, or ownerId to a set of business IDs for customer filter. Returns null if no filter. */
@@ -209,7 +221,13 @@ public class ProductController {
         return productRepository.findByProductIdWithImages(id)
                 .filter(product -> canAccessProduct(product, currentUser))
                 .filter(product -> allowViewProduct(product, currentUser))
-                .map(p -> ResponseEntity.ok(toDto(p)))
+                .map(p -> {
+                    int processingQty = supplierDeliveryItemRepository.sumProcessingQuantityByProductIds(List.of(p.getProductId())).stream()
+                            .findFirst()
+                            .map(row -> ((Number) row[1]).intValue())
+                            .orElse(0);
+                    return ResponseEntity.ok(toDto(p, processingQty));
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -218,7 +236,7 @@ public class ProductController {
         if (currentUser == null) {
             return isProductVisibleOnStorefront(product);
         }
-        if (isOwnerOrStaff(currentUser)) {
+        if (canListBusinessProducts(currentUser)) {
             return canAccessProduct(product, currentUser); // already checked above; allows their business only
         }
         return isProductVisibleOnStorefront(product); // customer: only approved from verified shops
@@ -245,6 +263,7 @@ public class ProductController {
         if (businessId == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
+        UUID actorUserId = currentUser != null ? currentUser.userId() : null;
         User owner = userRepository.findById(businessId).orElse(null);
         if (owner == null || !"verified".equalsIgnoreCase(owner.getVerificationStatus())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -260,6 +279,13 @@ public class ProductController {
                 .build();
         attachImages(product, dto.getImages(), dto.getImage());
         product = productRepository.save(product);
+        // Record initial stock if provided (> 0)
+        try {
+            int q = product.getQuantity() != null ? product.getQuantity() : 0;
+            if (q != 0) {
+                stockLedgerService.recordManualAdjustment(businessId, product, 0, q, actorUserId, "Initial stock on product creation");
+            }
+        } catch (Exception ignored) {}
         return ResponseEntity.ok(toDto(product));
     }
 
@@ -278,10 +304,19 @@ public class ProductController {
                     if (dto.getName() != null) product.setName(dto.getName());
                     if (dto.getCategory() != null) product.setCategory(dto.getCategory());
                     if (dto.getPrice() != null) product.setPrice(dto.getPrice());
+                    Integer previousQty = product.getQuantity() != null ? product.getQuantity() : 0;
                     if (dto.getQuantity() != null) product.setQuantity(dto.getQuantity());
                     if (dto.getDescription() != null) product.setDescription(dto.getDescription());
                     if (dto.getImages() != null) attachImages(product, dto.getImages(), dto.getImage());
                     product = productRepository.save(product);
+                    // Record stock adjustment if quantity changed
+                    try {
+                        Integer newQty = product.getQuantity() != null ? product.getQuantity() : 0;
+                        if (dto.getQuantity() != null && !newQty.equals(previousQty)) {
+                            UUID actorUserId = currentUser != null ? currentUser.userId() : null;
+                            stockLedgerService.recordManualAdjustment(businessId, product, previousQty, newQty, actorUserId, "Quantity updated via product edit");
+                        }
+                    } catch (Exception ignored) {}
                     // Notify active sellers when quantity is at or below threshold (in-app, WhatsApp, SMS)
                     if (product.getQuantity() != null && product.getQuantity() <= LOW_STOCK_THRESHOLD) {
                         try {
@@ -297,6 +332,55 @@ public class ProductController {
                     return ResponseEntity.ok(toDto(product));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Set product price from supplier cost with a margin.
+     * Price = unitCost × (1 + marginPercent/100).
+     * Owner-only so pricing decisions stay with the seller.
+     */
+    @PatchMapping("/{id}/price-from-cost")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<?> setPriceFromCost(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        UUID businessId = getBusinessId(currentUser);
+        if (businessId == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        if (!"owner".equalsIgnoreCase(currentUser != null ? currentUser.role() : "")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        BigDecimal unitCost = extractDecimal(body, "unitCost");
+        BigDecimal marginPercent = body.get("marginPercent") != null
+                ? new BigDecimal(body.get("marginPercent").toString())
+                : BigDecimal.ZERO;
+        if (unitCost == null || unitCost.compareTo(BigDecimal.ZERO) < 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "unitCost must be a non-negative number"));
+        }
+
+        return productRepository.findByProductIdAndBusinessId(id, businessId)
+                .map(product -> {
+                    // price = unitCost * (1 + marginPercent/100)
+                    BigDecimal multiplier = BigDecimal.ONE.add(marginPercent.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
+                    BigDecimal newPrice = unitCost.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+                    product.setPrice(newPrice);
+                    product = productRepository.save(product);
+                    return ResponseEntity.ok(toDto(product));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    private BigDecimal extractDecimal(Map<String, Object> body, String key) {
+        Object v = body.get(key);
+        if (v == null) return null;
+        if (v instanceof Number) return BigDecimal.valueOf(((Number) v).doubleValue());
+        try {
+            return new BigDecimal(v.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -357,6 +441,12 @@ public class ProductController {
         return "owner".equalsIgnoreCase(r) || "staff".equalsIgnoreCase(r);
     }
 
+    private boolean canListBusinessProducts(AuthenticatedUser user) {
+        if (user == null) return false;
+        String r = user.role();
+        return "owner".equalsIgnoreCase(r) || "staff".equalsIgnoreCase(r) || "supplier".equalsIgnoreCase(r);
+    }
+
     private UUID getBusinessId(AuthenticatedUser user) {
         if (user == null) return null;
         return userRepository.findById(user.userId())
@@ -366,7 +456,7 @@ public class ProductController {
 
     private boolean canAccessProduct(Product product, AuthenticatedUser currentUser) {
         if (currentUser == null) return true;
-        if (isOwnerOrStaff(currentUser)) {
+        if (canListBusinessProducts(currentUser)) {
             UUID businessId = getBusinessId(currentUser);
             return businessId != null && businessId.equals(product.getBusinessId());
         }
@@ -374,6 +464,10 @@ public class ProductController {
     }
 
     private ProductDto toDto(Product p) {
+        return toDto(p, 0);
+    }
+
+    private ProductDto toDto(Product p, int processingQuantity) {
         String mainImage = p.getImages().stream()
                 .filter(InventoryImage::getIsMain)
                 .findFirst()
@@ -386,6 +480,7 @@ public class ProductController {
                 .category(p.getCategory())
                 .price(p.getPrice())
                 .quantity(p.getQuantity())
+                .processingQuantity(processingQuantity > 0 ? processingQuantity : null)
                 .description(p.getDescription())
                 .image(mainImage)
                 .images(images)

@@ -234,6 +234,28 @@ public class MailService {
     }
 
     /**
+     * Welcome email for a new supplier (added by owner). Includes business name and temporary password.
+     */
+    public void sendWelcomeSupplier(@NonNull String toEmail, @NonNull String name, String businessName, @NonNull String temporaryPassword) {
+        String businessLine = (businessName != null && !businessName.isBlank())
+                ? "You have been added as a supplier for \"" + businessName + "\" on BiasharaHub."
+                : "You have been added as a supplier on BiasharaHub.";
+        String text = """
+                Hi %s,
+
+                %s
+
+                Your temporary password is: %s
+
+                Log in to the BiasharaHub app to view deliveries linked to you (in future supplier portal updates).
+                We recommend changing your password after first login.
+
+                If you did not expect this email, please contact your business owner.
+                """.formatted(name, businessLine, temporaryPassword);
+        send(toEmail, "Welcome to BiasharaHub – Supplier account", text);
+    }
+
+    /**
      * Welcome email for a new assistant admin (added by platform admin). Includes temporary password.
      * 2FA is always on for assistant admins.
      */

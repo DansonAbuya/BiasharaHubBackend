@@ -4,14 +4,19 @@ import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.ProductRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
+import com.biasharahub.service.BusinessInsightsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,22 +25,24 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/analytics")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('OWNER', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
 public class AnalyticsController {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final BusinessInsightsService businessInsightsService;
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAnalytics(@AuthenticationPrincipal AuthenticatedUser user) {
         if (user == null) return ResponseEntity.status(401).build();
         String role = user.role() != null ? user.role().toLowerCase() : "";
-        if (!"owner".equals(role) && !"staff".equals(role) && !"super_admin".equals(role) && !"assistant_admin".equals(role)) {
+        if (!"owner".equals(role) && !"super_admin".equals(role) && !"assistant_admin".equals(role)) {
             return ResponseEntity.status(403).build();
         }
 
         UUID businessId = null;
-        if ("owner".equals(role) || "staff".equals(role)) {
+        if ("owner".equals(role)) {
             businessId = userRepository.findById(user.userId())
                     .map(u -> u.getBusinessId())
                     .orElse(null);
@@ -88,5 +95,23 @@ public class AnalyticsController {
                 ))
                 .toList());
         return ResponseEntity.ok(analytics);
+    }
+
+    /**
+     * Business insights with period filters: daily, weekly, monthly, quarterly, custom.
+     * Returns profit/loss, product performance, staff activity, and period breakdown.
+     */
+    @GetMapping("/insights")
+    public ResponseEntity<Map<String, Object>> getInsights(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false, defaultValue = "MONTH") String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        if (user == null) return ResponseEntity.status(401).build();
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        if (!"owner".equals(role) && !"super_admin".equals(role) && !"assistant_admin".equals(role)) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(businessInsightsService.getInsights(user, period, from, to));
     }
 }
