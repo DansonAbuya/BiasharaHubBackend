@@ -20,7 +20,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/reconciliation")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+@PreAuthorize("hasRole('OWNER')")
 public class ReconciliationController {
 
     private final ReconciliationService reconciliationService;

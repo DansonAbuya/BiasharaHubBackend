@@ -27,4 +27,19 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     BigDecimal sumAmountByBusinessIdAndDateRange(@Param("businessId") UUID businessId,
                                                  @Param("from") LocalDate from,
                                                  @Param("to") LocalDate to);
+
+    /** Staff expense activity: userId, name, expenseCount, totalAmount for date range. */
+    @Query("""
+        SELECT e.createdBy.userId, e.createdBy.name, COUNT(e), COALESCE(SUM(e.amount), 0)
+        FROM Expense e
+        WHERE e.createdBy.businessId = :businessId
+        AND e.createdBy.role = 'staff'
+        AND e.expenseDate BETWEEN :from AND :to
+        GROUP BY e.createdBy.userId, e.createdBy.name
+        ORDER BY SUM(e.amount) DESC
+        """)
+    List<Object[]> findStaffExpenseActivityByBusinessIdAndDateRange(
+            @Param("businessId") UUID businessId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }

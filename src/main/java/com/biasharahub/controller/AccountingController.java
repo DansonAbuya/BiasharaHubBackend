@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/accounting")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+@PreAuthorize("hasRole('OWNER')")
 public class AccountingController {
 
     private final AccountingService accountingService;
