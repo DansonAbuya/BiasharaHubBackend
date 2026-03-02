@@ -21,6 +21,8 @@ public class ProductDto implements Serializable {
     private String category;
     private BigDecimal price;
     private Integer quantity;
+    /** Quantity in supplier deliveries that are being processed (not yet in stock). Shown to customers as "coming soon". */
+    private Integer processingQuantity;
     private String description;
     private String image;
     private List<String> images;

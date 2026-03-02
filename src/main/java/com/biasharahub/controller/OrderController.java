@@ -21,6 +21,7 @@ import com.biasharahub.service.InAppNotificationService;
 import com.biasharahub.service.OrderEventPublisher;
 import com.biasharahub.service.SmsNotificationService;
 import com.biasharahub.service.WhatsAppNotificationService;
+import com.biasharahub.service.StockLedgerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +56,7 @@ public class OrderController {
     private final InAppNotificationService inAppNotificationService;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final SmsNotificationService smsNotificationService;
+    private final StockLedgerService stockLedgerService;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -149,6 +151,7 @@ public class OrderController {
         for (CreateOrderRequest.OrderItemRequest item : request.getItems()) {
             Product product = productRepository.findById(item.getProductId()).orElseThrow();
             int qty = item.getQuantity() != null && item.getQuantity() > 0 ? item.getQuantity() : 1;
+            int prevQty = product.getQuantity() != null ? product.getQuantity() : 0;
             BigDecimal price = product.getPrice();
             BigDecimal subtotal = price.multiply(BigDecimal.valueOf(qty));
             total = total.add(subtotal);
@@ -163,6 +166,17 @@ public class OrderController {
             order.getItems().add(oi);
             product.setQuantity(product.getQuantity() - qty);
             productRepository.save(product);
+            try {
+                stockLedgerService.recordOrderMovement(
+                        product.getBusinessId(),
+                        product,
+                        prevQty,
+                        product.getQuantity() != null ? product.getQuantity() : 0,
+                        order,
+                        user.userId(),
+                        "ORDER_SOLD"
+                );
+            } catch (Exception ignored) {}
         }
         // Include shipping fee in total
         total = total.add(shippingFee);
@@ -329,8 +343,20 @@ public class OrderController {
                         Product product = oi.getProduct();
                         if (product != null) {
                             Integer currentQty = product.getQuantity() != null ? product.getQuantity() : 0;
+                            int prevQty = currentQty;
                             product.setQuantity(currentQty + oi.getQuantity());
                             productRepository.save(product);
+                            try {
+                                stockLedgerService.recordOrderMovement(
+                                        product.getBusinessId(),
+                                        product,
+                                        prevQty,
+                                        product.getQuantity() != null ? product.getQuantity() : 0,
+                                        o,
+                                        user.userId(),
+                                        "ORDER_CANCELLED_RESTOCK"
+                                );
+                            } catch (Exception ignored) {}
                         }
                     }
 
