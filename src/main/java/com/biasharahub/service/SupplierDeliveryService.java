@@ -53,6 +53,37 @@ public class SupplierDeliveryService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * List dispatches submitted by the currently logged-in supplier to the business they supply.
+     * Scoped by supplier record linked to the supplier user (email + business).
+     */
+    public List<SupplierDeliveryDto> listMyDispatchesAsSupplier(AuthenticatedUser user) {
+        if (user == null || user.role() == null || !"supplier".equalsIgnoreCase(user.role())) {
+            throw new IllegalArgumentException("Only suppliers can view their dispatches");
+        }
+        User actor = userRepository.findById(user.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        UUID businessId = actor.getBusinessId();
+        if (businessId == null) {
+            throw new IllegalArgumentException("Supplier is not linked to a business");
+        }
+        Supplier supplier = supplierRepository.findByEmailIgnoreCaseAndBusinessId(actor.getEmail(), businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Supplier record not found for your account"));
+
+        return supplierDeliveryRepository.findByBusinessIdAndSupplier_SupplierIdOrderByCreatedAtDesc(
+                        businessId, supplier.getSupplierId())
+                .stream()
+                .map(d -> {
+                    List<SupplierDeliveryItemDto> items = supplierDeliveryItemRepository
+                            .findByDeliveryIdWithProduct(d.getDeliveryId())
+                            .stream()
+                            .map(this::toItemDto)
+                            .collect(Collectors.toList());
+                    return toDto(d, items);
+                })
+                .collect(Collectors.toList());
+    }
+
     public SupplierDeliveryDto get(AuthenticatedUser user, UUID deliveryId) {
         UUID businessId = requireBusinessId(user);
         SupplierDelivery d = supplierDeliveryRepository.findByIdWithParties(deliveryId)

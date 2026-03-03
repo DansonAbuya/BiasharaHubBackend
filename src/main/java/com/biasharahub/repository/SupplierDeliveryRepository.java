@@ -13,6 +13,8 @@ public interface SupplierDeliveryRepository extends JpaRepository<SupplierDelive
 
     List<SupplierDelivery> findByBusinessIdOrderByCreatedAtDesc(UUID businessId);
 
+    List<SupplierDelivery> findByBusinessIdAndSupplier_SupplierIdOrderByCreatedAtDesc(UUID businessId, UUID supplierId);
+
     @Query("SELECT d FROM SupplierDelivery d " +
             "LEFT JOIN FETCH d.supplier " +
             "LEFT JOIN FETCH d.receivedBy " +
