@@ -53,17 +53,23 @@ public class PurchaseOrderController {
     }
 
     /**
-     * Seller center: get a single purchase order with items.
+     * Get a single purchase order with full item breakdown.
+     * Sellers (OWNER/STAFF): any PO for their business. Suppliers: only POs assigned to them.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPPLIER')")
     public ResponseEntity<?> get(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable UUID id) {
         try {
+            if (user.role() != null && "SUPPLIER".equalsIgnoreCase(user.role())) {
+                return ResponseEntity.ok(purchaseOrderService.getForSupplier(user, id));
+            }
             return ResponseEntity.ok(purchaseOrderService.getForBusiness(user, id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Failed to load purchase order"));
         }
     }
 
@@ -77,6 +83,8 @@ public class PurchaseOrderController {
             return ResponseEntity.ok(purchaseOrderService.listForSupplier(user));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Failed to list purchase orders"));
         }
     }
 }
