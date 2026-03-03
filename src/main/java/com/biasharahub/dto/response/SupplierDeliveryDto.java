@@ -18,6 +18,8 @@ public class SupplierDeliveryDto {
     private UUID businessId;
     private UUID supplierId;
     private String supplierName;
+    private UUID purchaseOrderId;
+    private String poNumber;
     private String deliveryNoteRef;
     private Instant deliveredAt;
     private Instant receivedAt;
