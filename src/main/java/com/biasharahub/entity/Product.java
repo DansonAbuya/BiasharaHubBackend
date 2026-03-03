@@ -51,7 +51,7 @@ public class Product {
     /** Moderation: pending_review, approved, rejected */
     @Column(name = "moderation_status", length = 32)
     @Builder.Default
-    private String moderationStatus = "approved";
+    private String moderationStatus = "pending_review";
 
     @Column(name = "moderated_at")
     private Instant moderatedAt;
