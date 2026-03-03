@@ -62,5 +62,6 @@
     <include file="db/changelog/changes/055-allow-supplier-role-in-existing-tenants.sql"/>
     <include file="db/changelog/changes/056-add-processing-status-to-supplier-deliveries.sql"/>
     <include file="db/changelog/changes/057-supplier-dispatched-and-received-quantity.sql"/>
+    <include file="db/changelog/changes/059-drop-legacy-users-role-check.sql"/>
 
 </databaseChangeLog>
