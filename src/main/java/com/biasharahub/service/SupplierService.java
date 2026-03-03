@@ -43,7 +43,8 @@ public class SupplierService {
                 .email(request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null)
                 .createdBy(actor)
                 .build();
-        s = supplierRepository.save(s);
+        // Persist supplier immediately so that any database errors surface before we try to send emails.
+        s = supplierRepository.saveAndFlush(s);
         // Optionally create a login account for this supplier (role = supplier) with temporary password.
         // Any failure here should NOT break supplier creation on the frontend (to avoid 500s).
         if (s.getEmail() != null && !s.getEmail().isBlank()) {
