@@ -43,7 +43,13 @@ public class SupplierDeliveryService {
         UUID businessId = requireBusinessId(user);
         return supplierDeliveryRepository.findByBusinessIdOrderByCreatedAtDesc(businessId)
                 .stream()
-                .map(d -> toDto(d, List.of()))
+                .map(d -> {
+                    List<SupplierDeliveryItemDto> items = supplierDeliveryItemRepository.findByDeliveryIdWithProduct(d.getDeliveryId())
+                            .stream()
+                            .map(this::toItemDto)
+                            .collect(Collectors.toList());
+                    return toDto(d, items);
+                })
                 .collect(Collectors.toList());
     }
 
