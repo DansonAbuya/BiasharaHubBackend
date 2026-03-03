@@ -144,13 +144,16 @@ public class SupplierDeliveryService {
     }
 
     /**
-     * Seller confirms physical receipt. For DISPATCHED: sets received_quantity per item (if different from supplier's).
-     * Moves to PROCESSING. Products may need processing before going to stock.
+     * Seller confirms physical receipt.
+     * - For DISPATCHED: sets received_quantity per item (if different from supplier's) and moves directly to RECEIVED.
+     * - For DRAFT (manually created): same behaviour.
+     * Quantities are added to stock immediately; there is no intermediate processing stage.
      */
     @Transactional
     public SupplierDeliveryDto confirmReceipt(AuthenticatedUser user, UUID deliveryId, ConfirmReceiptRequest request) {
-        if (!"owner".equalsIgnoreCase(user.role())) {
-            throw new IllegalArgumentException("Only the business owner can confirm delivery receipt");
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        if (!"owner".equals(role) && !"staff".equals(role)) {
+            throw new IllegalArgumentException("Only the business owner or staff can confirm delivery receipt");
         }
         User actor = userRepository.findById(user.userId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         UUID businessId = requireBusinessId(user);
@@ -166,47 +169,13 @@ public class SupplierDeliveryService {
 
         java.util.Map<UUID, Integer> received = request != null && request.getReceivedQuantities() != null
                 ? request.getReceivedQuantities() : java.util.Map.of();
+
         for (SupplierDeliveryItem item : items) {
             Integer qty = received.get(item.getItemId());
+            // If client sent a non-null quantity (including 0), use it; otherwise fall back to supplier-stated quantity.
             item.setReceivedQuantity(qty != null ? qty : item.getQuantity());
             supplierDeliveryItemRepository.save(item);
-        }
 
-        d.setStatus("PROCESSING");
-        d.setReceivedAt(Instant.now());
-        d.setReceivedBy(actor);
-        supplierDeliveryRepository.save(d);
-
-        return get(user, deliveryId);
-    }
-
-    /** Legacy: Start processing (DRAFT only). Use confirmReceipt for DISPATCHED. */
-    @Transactional
-    public SupplierDeliveryDto startProcessing(AuthenticatedUser user, UUID deliveryId) {
-        return confirmReceipt(user, deliveryId, null);
-    }
-
-    /**
-     * Step 2: Owner confirms processing complete. Moves to RECEIVED and adds quantities to stock.
-     */
-    @Transactional
-    public SupplierDeliveryDto moveToStock(AuthenticatedUser user, UUID deliveryId) {
-        if (!"owner".equalsIgnoreCase(user.role())) {
-            throw new IllegalArgumentException("Only the business owner can move items to stock");
-        }
-        User actor = userRepository.findById(user.userId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
-        UUID businessId = requireBusinessId(user);
-        SupplierDelivery d = supplierDeliveryRepository.findByIdWithParties(deliveryId)
-                .orElseThrow(() -> new IllegalArgumentException("Delivery not found"));
-        if (!businessId.equals(d.getBusinessId())) throw new IllegalArgumentException("Forbidden");
-        if (!"PROCESSING".equalsIgnoreCase(d.getStatus())) {
-            throw new IllegalArgumentException("Delivery must be in processing before moving to stock");
-        }
-
-        List<SupplierDeliveryItem> items = supplierDeliveryItemRepository.findByDeliveryIdWithProduct(deliveryId);
-        if (items.isEmpty()) throw new IllegalArgumentException("No items in delivery");
-
-        for (SupplierDeliveryItem item : items) {
             int qtyToAdd = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : (item.getQuantity() != null ? item.getQuantity() : 0);
             if (qtyToAdd <= 0) continue;
             Product product = item.getProduct();
@@ -227,6 +196,8 @@ public class SupplierDeliveryService {
         }
 
         d.setStatus("RECEIVED");
+        d.setReceivedAt(Instant.now());
+        d.setReceivedBy(actor);
         supplierDeliveryRepository.save(d);
 
         return get(user, deliveryId);

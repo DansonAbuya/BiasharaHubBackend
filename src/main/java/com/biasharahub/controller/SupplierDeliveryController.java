@@ -1,6 +1,7 @@
 package com.biasharahub.controller;
 
 import com.biasharahub.dto.request.AddSupplierDeliveryItemRequest;
+import com.biasharahub.dto.request.ConfirmReceiptRequest;
 import com.biasharahub.dto.request.CreateSupplierDeliveryRequest;
 import com.biasharahub.dto.response.SupplierDeliveryDto;
 import com.biasharahub.security.AuthenticatedUser;
@@ -61,21 +62,17 @@ public class SupplierDeliveryController {
         }
     }
 
-    @PatchMapping("/{id}/start-processing")
-    @PreAuthorize("hasRole('OWNER')")
-    public ResponseEntity<?> startProcessing(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
+    /**
+     * Confirm supplier delivery receipt and move quantities directly to stock.
+     * Optional body allows overriding received quantities per item.
+     */
+    @PatchMapping("/{id}/confirm-receipt")
+    public ResponseEntity<?> confirmReceipt(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id,
+            @RequestBody(required = false) ConfirmReceiptRequest request) {
         try {
-            return ResponseEntity.ok(supplierDeliveryService.startProcessing(user, id));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    @PatchMapping("/{id}/move-to-stock")
-    @PreAuthorize("hasRole('OWNER')")
-    public ResponseEntity<?> moveToStock(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
-        try {
-            return ResponseEntity.ok(supplierDeliveryService.moveToStock(user, id));
+            return ResponseEntity.ok(supplierDeliveryService.confirmReceipt(user, id, request));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
