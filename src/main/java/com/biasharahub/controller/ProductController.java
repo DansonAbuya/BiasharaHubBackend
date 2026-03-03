@@ -276,6 +276,8 @@ public class ProductController {
                 .quantity(dto.getQuantity() != null ? dto.getQuantity() : 0)
                 .description(dto.getDescription())
                 .businessId(businessId)
+                // New products should not be visible to customers until explicitly approved.
+                .moderationStatus("pending_review")
                 .build();
         attachImages(product, dto.getImages(), dto.getImage());
         product = productRepository.save(product);
@@ -329,6 +331,31 @@ public class ProductController {
                             smsNotificationService.notifySellerLowStock(product);
                         } catch (Exception ignored) {}
                     }
+                    return ResponseEntity.ok(toDto(product));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Owner marks a product as ready for sale (approved for storefront).
+     * This does not change stock; it only controls customer visibility.
+     */
+    @PatchMapping("/{id}/approve")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<?> approveProduct(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        UUID businessId = getBusinessId(currentUser);
+        if (businessId == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        UUID actorUserId = currentUser != null ? currentUser.userId() : null;
+        return productRepository.findByProductIdAndBusinessId(id, businessId)
+                .map(product -> {
+                    product.setModerationStatus("approved");
+                    product.setModeratedAt(java.time.Instant.now());
+                    product.setModeratedByUserId(actorUserId);
+                    product = productRepository.save(product);
                     return ResponseEntity.ok(toDto(product));
                 })
                 .orElse(ResponseEntity.notFound().build());
