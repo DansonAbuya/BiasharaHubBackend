@@ -20,17 +20,24 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/supplier-deliveries")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
 public class SupplierDeliveryController {
 
     private final SupplierDeliveryService supplierDeliveryService;
 
     @GetMapping
-    public ResponseEntity<List<SupplierDeliveryDto>> list(@AuthenticationPrincipal AuthenticatedUser user) {
-        return ResponseEntity.ok(supplierDeliveryService.listMyBusinessDeliveries(user));
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
+    public ResponseEntity<?> list(@AuthenticationPrincipal AuthenticatedUser user) {
+        try {
+            return ResponseEntity.ok(supplierDeliveryService.listMyBusinessDeliveries(user));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Failed to list deliveries"));
+        }
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
     public ResponseEntity<?> get(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id) {
         try {
             return ResponseEntity.ok(supplierDeliveryService.get(user, id));
@@ -40,6 +47,7 @@ public class SupplierDeliveryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
     public ResponseEntity<?> create(
             @AuthenticationPrincipal AuthenticatedUser user,
             @Valid @RequestBody CreateSupplierDeliveryRequest request) {
@@ -51,6 +59,7 @@ public class SupplierDeliveryController {
     }
 
     @PostMapping("/{id}/items")
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
     public ResponseEntity<?> addItem(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable UUID id,
@@ -67,12 +76,41 @@ public class SupplierDeliveryController {
      * Optional body allows overriding received quantities per item.
      */
     @PatchMapping("/{id}/confirm-receipt")
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
     public ResponseEntity<?> confirmReceipt(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable UUID id,
             @RequestBody(required = false) ConfirmReceiptRequest request) {
         try {
             return ResponseEntity.ok(supplierDeliveryService.confirmReceipt(user, id, request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Supplier: submit a dispatch to the seller.
+     */
+    @PostMapping("/dispatch")
+    @PreAuthorize("hasRole('SUPPLIER')")
+    public ResponseEntity<?> submitDispatch(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @Valid @RequestBody com.biasharahub.dto.request.SubmitDispatchRequest request) {
+        try {
+            return ResponseEntity.ok(supplierDeliveryService.submitDispatch(user, request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Supplier: list their own dispatches to this business (for reconciliation).
+     */
+    @GetMapping("/my-dispatches")
+    @PreAuthorize("hasRole('SUPPLIER')")
+    public ResponseEntity<?> listMyDispatches(@AuthenticationPrincipal AuthenticatedUser user) {
+        try {
+            return ResponseEntity.ok(supplierDeliveryService.listMyDispatchesAsSupplier(user));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

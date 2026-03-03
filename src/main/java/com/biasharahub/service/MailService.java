@@ -24,6 +24,13 @@ public class MailService {
     @Value("${app.mail.from:no-reply@biasharahub.local}")
     private String defaultFrom;
 
+    /** From header with display name so recipients always see "BiasharaHub". */
+    private String getFromWithDisplayName() {
+        String addr = defaultFrom != null && !defaultFrom.isBlank() ? defaultFrom.trim() : "no-reply@biasharahub.local";
+        // Standard RFC 5322 display name format: BiasharaHub <no-reply@...>
+        return "BiasharaHub <" + addr + ">";
+    }
+
     /**
      * Send 2FA verification code to the user. Uses Gmail OAuth when configured.
      */
@@ -37,7 +44,7 @@ public class MailService {
                 """.formatted(code);
         EmailMessage message = EmailMessage.builder()
                 .to(List.of(toEmail))
-                .from(defaultFrom)
+                .from(getFromWithDisplayName())
                 .subject("Your BiasharaHub login code")
                 .textBody(text)
                 .build();
@@ -80,7 +87,7 @@ public class MailService {
     public void send(@NonNull String toEmail, @NonNull String subject, @NonNull String textBody) {
         EmailMessage message = EmailMessage.builder()
                 .to(List.of(toEmail))
-                .from(defaultFrom)
+                .from(getFromWithDisplayName())
                 .subject(subject)
                 .textBody(textBody)
                 .build();

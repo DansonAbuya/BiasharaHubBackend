@@ -35,6 +35,9 @@ public class SupplierController {
             return ResponseEntity.ok(supplierService.create(user, request));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            // Avoid exposing internals to the frontend; surface a clear, non-500 error instead of bubbling as 500.
+            return ResponseEntity.status(400).body(Map.of("error", "Supplier creation failed: " + e.getMessage()));
         }
     }
 

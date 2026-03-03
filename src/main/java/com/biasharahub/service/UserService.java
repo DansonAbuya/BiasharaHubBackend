@@ -16,6 +16,7 @@ import com.biasharahub.security.AuthenticatedUser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
@@ -292,8 +293,11 @@ public class UserService {
     /**
      * Owner adds a supplier user account (linked to an existing Supplier record).
      * Temporary password is generated and sent by email.
+     *
+     * Runs in a separate transaction so that any failure here (e.g. CHECK constraint on users.role in
+     * environments where 'supplier' is not yet allowed) does NOT roll back the supplier row itself.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public UserDto addSupplierUser(User owner, com.biasharahub.entity.Supplier supplier) {
         if (owner == null || !"owner".equalsIgnoreCase(owner.getRole())) {
             throw new IllegalArgumentException("Only owners can add suppliers");
