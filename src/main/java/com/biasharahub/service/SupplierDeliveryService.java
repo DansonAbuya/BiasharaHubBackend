@@ -39,6 +39,7 @@ public class SupplierDeliveryService {
     private final UserRepository userRepository;
     private final StockLedgerService stockLedgerService;
 
+    @Transactional(readOnly = true)
     public List<SupplierDeliveryDto> listMyBusinessDeliveries(AuthenticatedUser user) {
         UUID businessId = requireBusinessId(user);
         return supplierDeliveryRepository.findByBusinessIdOrderByCreatedAtDesc(businessId)
@@ -57,6 +58,7 @@ public class SupplierDeliveryService {
      * List dispatches submitted by the currently logged-in supplier to the business they supply.
      * Scoped by supplier record linked to the supplier user (email + business).
      */
+    @Transactional(readOnly = true)
     public List<SupplierDeliveryDto> listMyDispatchesAsSupplier(AuthenticatedUser user) {
         if (user == null || user.role() == null || !"supplier".equalsIgnoreCase(user.role())) {
             throw new IllegalArgumentException("Only suppliers can view their dispatches");
@@ -84,6 +86,7 @@ public class SupplierDeliveryService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public SupplierDeliveryDto get(AuthenticatedUser user, UUID deliveryId) {
         UUID businessId = requireBusinessId(user);
         SupplierDelivery d = supplierDeliveryRepository.findByIdWithParties(deliveryId)

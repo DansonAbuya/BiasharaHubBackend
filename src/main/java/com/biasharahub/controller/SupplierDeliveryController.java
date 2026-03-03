@@ -26,8 +26,14 @@ public class SupplierDeliveryController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('OWNER', 'STAFF', 'SUPER_ADMIN', 'ASSISTANT_ADMIN')")
-    public ResponseEntity<List<SupplierDeliveryDto>> list(@AuthenticationPrincipal AuthenticatedUser user) {
-        return ResponseEntity.ok(supplierDeliveryService.listMyBusinessDeliveries(user));
+    public ResponseEntity<?> list(@AuthenticationPrincipal AuthenticatedUser user) {
+        try {
+            return ResponseEntity.ok(supplierDeliveryService.listMyBusinessDeliveries(user));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage() != null ? e.getMessage() : "Failed to list deliveries"));
+        }
     }
 
     @GetMapping("/{id}")
