@@ -116,6 +116,31 @@ public class PurchaseOrderService {
         return toDto(po);
     }
 
+    /**
+     * Supplier portal: get a single purchase order (with full item breakdown) for the logged-in supplier.
+     */
+    @Transactional(readOnly = true)
+    public PurchaseOrderDto getForSupplier(AuthenticatedUser user, UUID id) {
+        if (user == null || user.role() == null || !"supplier".equalsIgnoreCase(user.role())) {
+            throw new IllegalArgumentException("Only suppliers can view purchase order details");
+        }
+        User supplierUser = userRepository.findById(user.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        UUID businessId = supplierUser.getBusinessId();
+        if (businessId == null) {
+            throw new IllegalArgumentException("Supplier is not linked to a business");
+        }
+        Supplier supplier = supplierRepository.findByEmailIgnoreCaseAndBusinessId(supplierUser.getEmail(), businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Supplier record not found for your account"));
+        PurchaseOrder po = purchaseOrderRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Purchase order not found"));
+        if (!businessId.equals(po.getBusinessId()) || po.getSupplier() == null
+                || !supplier.getSupplierId().equals(po.getSupplier().getSupplierId())) {
+            throw new IllegalArgumentException("Purchase order not found or access denied");
+        }
+        return toDto(po);
+    }
+
     private UUID requireBusinessId(AuthenticatedUser user) {
         if (user == null) throw new IllegalArgumentException("Not authenticated");
         return userRepository.findById(user.userId())
