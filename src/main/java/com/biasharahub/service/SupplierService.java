@@ -44,12 +44,15 @@ public class SupplierService {
                 .createdBy(actor)
                 .build();
         s = supplierRepository.save(s);
-        // Optionally create a login account for this supplier (role = supplier) with temporary password
+        // Optionally create a login account for this supplier (role = supplier) with temporary password.
+        // Any failure here should NOT break supplier creation on the frontend (to avoid 500s).
         if (s.getEmail() != null && !s.getEmail().isBlank()) {
             try {
                 userService.addSupplierUser(actor, s);
             } catch (IllegalArgumentException ignored) {
-                // If email already has an account, skip silently – supplier can reuse it
+                // If email already has an account, skip silently – supplier can reuse it.
+            } catch (Exception ignored) {
+                // Swallow other unexpected failures (e.g. email provider issues) so supplier still saves.
             }
         }
         return toDto(s);
