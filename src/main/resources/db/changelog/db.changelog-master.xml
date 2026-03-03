@@ -64,5 +64,6 @@
     <include file="db/changelog/changes/057-supplier-dispatched-and-received-quantity.sql"/>
     <include file="db/changelog/changes/059-drop-legacy-users-role-check.sql"/>
     <include file="db/changelog/changes/060-tenant-purchase-orders-table.sql"/>
+    <include file="db/changelog/changes/061-add-purchase-order-id-to-supplier-deliveries.sql"/>
 
 </databaseChangeLog>

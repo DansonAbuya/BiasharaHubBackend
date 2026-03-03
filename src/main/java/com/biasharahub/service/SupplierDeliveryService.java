@@ -11,6 +11,8 @@ import com.biasharahub.entity.Supplier;
 import com.biasharahub.entity.SupplierDelivery;
 import com.biasharahub.entity.SupplierDeliveryItem;
 import com.biasharahub.entity.User;
+import com.biasharahub.entity.PurchaseOrder;
+import com.biasharahub.repository.PurchaseOrderRepository;
 import com.biasharahub.repository.ProductRepository;
 import com.biasharahub.repository.SupplierDeliveryItemRepository;
 import com.biasharahub.repository.SupplierDeliveryRepository;
@@ -36,6 +38,7 @@ public class SupplierDeliveryService {
     private final SupplierDeliveryRepository supplierDeliveryRepository;
     private final SupplierDeliveryItemRepository supplierDeliveryItemRepository;
     private final ProductRepository productRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
     private final UserRepository userRepository;
     private final StockLedgerService stockLedgerService;
 
@@ -112,9 +115,20 @@ public class SupplierDeliveryService {
         Supplier supplier = supplierRepository.findByEmailIgnoreCaseAndBusinessId(actor.getEmail(), businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Supplier record not found for your account"));
 
+        PurchaseOrder po = null;
+        if (request.getPurchaseOrderId() != null) {
+            po = purchaseOrderRepository.findById(request.getPurchaseOrderId())
+                    .orElseThrow(() -> new IllegalArgumentException("Purchase order not found"));
+            if (!businessId.equals(po.getBusinessId()) || po.getSupplier() == null
+                    || !po.getSupplier().getSupplierId().equals(supplier.getSupplierId())) {
+                throw new IllegalArgumentException("Purchase order not found or not assigned to you");
+            }
+        }
+
         SupplierDelivery d = SupplierDelivery.builder()
                 .businessId(businessId)
                 .supplier(supplier)
+                .purchaseOrder(po)
                 .deliveryNoteRef(request.getDeliveryNoteRef() != null ? request.getDeliveryNoteRef().trim() : null)
                 .deliveredAt(Instant.now())
                 .status("DISPATCHED")
@@ -272,6 +286,8 @@ public class SupplierDeliveryService {
                 .businessId(d.getBusinessId())
                 .supplierId(d.getSupplier() != null ? d.getSupplier().getSupplierId() : null)
                 .supplierName(d.getSupplier() != null ? d.getSupplier().getName() : null)
+                .purchaseOrderId(d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPurchaseOrderId() : null)
+                .poNumber(d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null)
                 .deliveryNoteRef(d.getDeliveryNoteRef())
                 .deliveredAt(d.getDeliveredAt())
                 .receivedAt(d.getReceivedAt())

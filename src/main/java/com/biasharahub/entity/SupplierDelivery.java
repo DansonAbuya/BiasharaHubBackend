@@ -31,6 +31,10 @@ public class SupplierDelivery {
     @JoinColumn(name = "supplier_id")
     private Supplier supplier;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "purchase_order_id")
+    private PurchaseOrder purchaseOrder;
+
     @Column(name = "delivery_note_ref", length = 255)
     private String deliveryNoteRef;
 

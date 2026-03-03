@@ -9,6 +9,10 @@ import java.util.List;
 /** Request for supplier to submit a dispatch (what they have sent to the seller). */
 @Data
 public class SubmitDispatchRequest {
+    /** Purchase order this dispatch fulfills. Required so the seller can reconcile. */
+    @NotNull(message = "Purchase order is required")
+    private java.util.UUID purchaseOrderId;
+
     private String deliveryNoteRef;
 
     @NotEmpty(message = "At least one item required")
