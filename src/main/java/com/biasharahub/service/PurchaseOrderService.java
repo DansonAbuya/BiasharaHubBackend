@@ -75,6 +75,7 @@ public class PurchaseOrderService {
         return toDto(po);
     }
 
+    @Transactional(readOnly = true)
     public List<PurchaseOrderDto> listForBusiness(AuthenticatedUser user) {
         UUID businessId = requireBusinessId(user);
         return purchaseOrderRepository.findByBusinessIdOrderByCreatedAtDesc(businessId)
@@ -83,6 +84,7 @@ public class PurchaseOrderService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<PurchaseOrderDto> listForSupplier(AuthenticatedUser user) {
         if (user == null || user.role() == null || !"supplier".equalsIgnoreCase(user.role())) {
             throw new IllegalArgumentException("Only suppliers can view their purchase orders");
@@ -103,6 +105,7 @@ public class PurchaseOrderService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public PurchaseOrderDto getForBusiness(AuthenticatedUser user, UUID id) {
         UUID businessId = requireBusinessId(user);
         PurchaseOrder po = purchaseOrderRepository.findById(id)
