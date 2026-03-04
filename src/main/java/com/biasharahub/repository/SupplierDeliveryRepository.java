@@ -21,5 +21,7 @@ public interface SupplierDeliveryRepository extends JpaRepository<SupplierDelive
             "LEFT JOIN FETCH d.createdBy " +
             "WHERE d.deliveryId = :id")
     Optional<SupplierDelivery> findByIdWithParties(@Param("id") UUID id);
+
+    boolean existsByPurchaseOrder_PurchaseOrderId(UUID purchaseOrderId);
 }
 
