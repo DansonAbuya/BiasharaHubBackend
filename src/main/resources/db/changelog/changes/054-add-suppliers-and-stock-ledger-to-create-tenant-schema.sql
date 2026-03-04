@@ -37,6 +37,7 @@ BEGIN
         received_at TIMESTAMP WITH TIME ZONE,
         received_by_user_id UUID REFERENCES %I.users(user_id) ON DELETE SET NULL,
         status VARCHAR(32) NOT NULL DEFAULT ''DRAFT'' CHECK (status IN (''DRAFT'', ''DISPATCHED'', ''PROCESSING'', ''RECEIVED'')),
+        stock_updated_at TIMESTAMP WITH TIME ZONE,
         created_by_user_id UUID REFERENCES %I.users(user_id) ON DELETE SET NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )', v_schema, v_schema, v_schema, v_schema, v_schema);

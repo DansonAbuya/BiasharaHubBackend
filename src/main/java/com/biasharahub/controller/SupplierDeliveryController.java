@@ -107,6 +107,22 @@ public class SupplierDeliveryController {
     }
 
     /**
+     * Add this delivery's received quantities to product stock. Allowed only when delivery is RECEIVED,
+     * not yet added, and all products in this delivery have zero current stock (previous dispatch sold out).
+     */
+    @PostMapping("/{id}/add-to-stock")
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
+    public ResponseEntity<?> addDeliveryToStock(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id) {
+        try {
+            return ResponseEntity.ok(supplierDeliveryService.addDeliveryToStock(user, id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
      * Supplier: submit a dispatch to the seller.
      */
     @PostMapping("/dispatch")

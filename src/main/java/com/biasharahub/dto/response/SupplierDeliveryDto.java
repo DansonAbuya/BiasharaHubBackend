@@ -26,6 +26,8 @@ public class SupplierDeliveryDto {
     private UUID receivedByUserId;
     private String receivedByName;
     private String status;
+    /** When set, received quantities from this delivery have been added to product stock. */
+    private Instant stockUpdatedAt;
     private Instant createdAt;
     private List<SupplierDeliveryItemDto> items;
     /** Supplier-stated total quantity across all items. */
