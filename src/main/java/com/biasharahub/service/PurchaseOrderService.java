@@ -6,6 +6,7 @@ import com.biasharahub.dto.response.PurchaseOrderItemDto;
 import com.biasharahub.entity.*;
 import com.biasharahub.repository.PurchaseOrderRepository;
 import com.biasharahub.repository.ProductRepository;
+import com.biasharahub.repository.SupplierDeliveryRepository;
 import com.biasharahub.repository.SupplierRepository;
 import com.biasharahub.repository.UserRepository;
 import com.biasharahub.security.AuthenticatedUser;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -25,6 +28,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
     private final ProductRepository productRepository;
+    private final SupplierDeliveryRepository supplierDeliveryRepository;
     private final UserRepository userRepository;
 
     @Transactional
@@ -39,10 +43,13 @@ public class PurchaseOrderService {
             throw new IllegalArgumentException("Supplier does not belong to your business");
         }
 
+        String generatedPoNumber = generatePoNumber(businessId);
+
         PurchaseOrder po = PurchaseOrder.builder()
                 .businessId(businessId)
                 .supplier(supplier)
-                .poNumber(request.getPoNumber() != null ? request.getPoNumber().trim() : null)
+                // Always use a system-generated PO number; ignore any client-provided value
+                .poNumber(generatedPoNumber)
                 .deliveryNoteRef(request.getDeliveryNoteRef() != null ? request.getDeliveryNoteRef().trim() : null)
                 .expectedDeliveryDate(request.getExpectedDeliveryDate())
                 .status("DRAFT")
@@ -98,6 +105,13 @@ public class PurchaseOrderService {
         return toDto(po);
     }
 
+    private String generatePoNumber(UUID businessId) {
+        long countForBusiness = purchaseOrderRepository.countByBusinessId(businessId);
+        String datePart = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE); // yyyyMMdd
+        long sequence = countForBusiness + 1;
+        return String.format("PO-%s-%04d", datePart, sequence);
+    }
+
     @Transactional(readOnly = true)
     public List<PurchaseOrderDto> listForBusiness(AuthenticatedUser user) {
         UUID businessId = requireBusinessId(user);
@@ -121,9 +135,11 @@ public class PurchaseOrderService {
         Supplier supplier = supplierRepository.findByEmailIgnoreCaseAndBusinessId(supplierUser.getEmail(), businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Supplier record not found for your account"));
 
-        return purchaseOrderRepository.findByBusinessIdAndSupplier_SupplierIdOrderByCreatedAtDesc(
-                        businessId, supplier.getSupplierId())
+        return purchaseOrderRepository
+                .findByBusinessIdAndSupplier_SupplierIdOrderByCreatedAtDesc(businessId, supplier.getSupplierId())
                 .stream()
+                // Once a dispatch has been submitted for a PO, hide it from the supplier
+                .filter(po -> !supplierDeliveryRepository.existsByPurchaseOrder_PurchaseOrderId(po.getPurchaseOrderId()))
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }

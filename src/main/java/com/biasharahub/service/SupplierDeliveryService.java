@@ -124,6 +124,11 @@ public class SupplierDeliveryService {
                     || !po.getSupplier().getSupplierId().equals(supplier.getSupplierId())) {
                 throw new IllegalArgumentException("Purchase order not found or not assigned to you");
             }
+            // Prevent multiple dispatches for the same purchase order by this supplier
+            boolean alreadyDispatched = supplierDeliveryRepository.existsByPurchaseOrder_PurchaseOrderId(po.getPurchaseOrderId());
+            if (alreadyDispatched) {
+                throw new IllegalArgumentException("You have already submitted a dispatch for this purchase order");
+            }
         }
 
         SupplierDelivery d = SupplierDelivery.builder()

@@ -11,5 +11,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UU
     List<PurchaseOrder> findByBusinessIdOrderByCreatedAtDesc(UUID businessId);
 
     List<PurchaseOrder> findByBusinessIdAndSupplier_SupplierIdOrderByCreatedAtDesc(UUID businessId, UUID supplierId);
+
+    long countByBusinessId(UUID businessId);
 }
 
