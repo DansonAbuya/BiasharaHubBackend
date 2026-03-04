@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,11 +30,24 @@ public class CreatePurchaseOrderRequest {
         private String description; // required if productId is null
         private String unitOfMeasure; // e.g. kg, piece, box
 
+        /**
+         * Optional customer-facing name for this item. If provided and productId is null,
+         * this will be used as the initial Product.name; otherwise the description is used.
+         */
+        private String customerName;
+
+        /**
+         * Optional initial customer-facing price for this item. If provided and productId
+         * is null, this will be used as the initial Product.price; otherwise expectedUnitCost
+         * (supplier-facing expected cost) is used.
+         */
+        private BigDecimal customerPrice;
+
         @NotNull
         private Integer requestedQuantity;
 
         // optional; supplier will quote actual unit cost when dispatching
-        private java.math.BigDecimal expectedUnitCost;
+        private BigDecimal expectedUnitCost;
     }
 }
 
