@@ -4,6 +4,7 @@ import com.biasharahub.dto.request.AddSupplierDeliveryItemRequest;
 import com.biasharahub.dto.request.ConfirmReceiptRequest;
 import com.biasharahub.dto.request.CreateSupplierDeliveryRequest;
 import com.biasharahub.dto.request.SubmitDispatchRequest;
+import com.biasharahub.dto.request.ConvertDeliveryItemRequest;
 import com.biasharahub.dto.response.SupplierDeliveryDto;
 import com.biasharahub.dto.response.SupplierDeliveryItemDto;
 import com.biasharahub.entity.Product;
@@ -253,6 +254,113 @@ public class SupplierDeliveryService {
         d.setReceivedAt(Instant.now());
         d.setReceivedBy(actor);
         supplierDeliveryRepository.save(d);
+
+        return get(user, deliveryId);
+    }
+
+    /**
+     * Subdivide part of a received delivery item into separate sale units / product.
+     * Decreases stock on the source product and increases stock on the target product.
+     */
+    @Transactional
+    public SupplierDeliveryDto convertItem(AuthenticatedUser user, UUID deliveryId, UUID itemId, ConvertDeliveryItemRequest request) {
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        if (!"owner".equals(role) && !"staff".equals(role)) {
+            throw new IllegalArgumentException("Only the business owner or staff can convert received items");
+        }
+        User actor = userRepository.findById(user.userId())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        UUID businessId = requireBusinessId(user);
+
+        SupplierDelivery delivery = supplierDeliveryRepository.findByIdWithParties(deliveryId)
+                .orElseThrow(() -> new IllegalArgumentException("Delivery not found"));
+        if (!businessId.equals(delivery.getBusinessId())) {
+            throw new IllegalArgumentException("Forbidden");
+        }
+        if (!"RECEIVED".equalsIgnoreCase(delivery.getStatus())) {
+            throw new IllegalArgumentException("You can only convert items from a RECEIVED delivery");
+        }
+
+        SupplierDeliveryItem item = supplierDeliveryItemRepository.findById(itemId)
+                .orElseThrow(() -> new IllegalArgumentException("Delivery item not found"));
+        if (!item.getDelivery().getDeliveryId().equals(deliveryId)) {
+            throw new IllegalArgumentException("Item does not belong to this delivery");
+        }
+
+        Product sourceProduct = item.getProduct();
+        if (sourceProduct == null || sourceProduct.getBusinessId() == null || !businessId.equals(sourceProduct.getBusinessId())) {
+            throw new IllegalArgumentException("Source product not found for this business");
+        }
+
+        int baseReceived = item.getReceivedQuantity() != null
+                ? item.getReceivedQuantity()
+                : (item.getQuantity() != null ? item.getQuantity() : 0);
+        int sourceUsed = request.getSourceQuantityUsed() != null ? request.getSourceQuantityUsed() : baseReceived;
+        if (sourceUsed <= 0) {
+            throw new IllegalArgumentException("Source quantity used must be greater than zero");
+        }
+
+        int produced = request.getProducedQuantity() != null ? request.getProducedQuantity() : 0;
+        if (produced <= 0) {
+            throw new IllegalArgumentException("Produced quantity must be greater than zero");
+        }
+
+        int sourceCurrentQty = sourceProduct.getQuantity() != null ? sourceProduct.getQuantity() : 0;
+        if (sourceUsed > sourceCurrentQty) {
+            throw new IllegalArgumentException("Not enough stock on the source product to convert");
+        }
+
+        // Determine or create target product
+        Product targetProduct;
+        if (request.getTargetProductId() != null) {
+            targetProduct = productRepository.findById(request.getTargetProductId())
+                    .orElseThrow(() -> new IllegalArgumentException("Target product not found"));
+            if (targetProduct.getBusinessId() == null || !businessId.equals(targetProduct.getBusinessId())) {
+                throw new IllegalArgumentException("Target product does not belong to your business");
+            }
+        } else {
+            String name = request.getTargetName() != null && !request.getTargetName().isBlank()
+                    ? request.getTargetName().trim()
+                    : (sourceProduct.getName() != null ? sourceProduct.getName() : "Converted item");
+            if (request.getTargetPrice() == null) {
+                throw new IllegalArgumentException("Target price is required when creating a new product");
+            }
+            targetProduct = Product.builder()
+                    .businessId(businessId)
+                    .name(name)
+                    .price(request.getTargetPrice())
+                    .quantity(0)
+                    .build();
+            targetProduct = productRepository.save(targetProduct);
+        }
+
+        // Decrease source stock
+        int srcPrev = sourceCurrentQty;
+        int srcNext = srcPrev - sourceUsed;
+        sourceProduct.setQuantity(srcNext);
+        productRepository.save(sourceProduct);
+        stockLedgerService.recordManualAdjustment(
+                businessId,
+                sourceProduct,
+                srcPrev,
+                srcNext,
+                actor.getUserId(),
+                request.getNote() != null ? request.getNote() : "Convert delivery item: consume source quantity"
+        );
+
+        // Increase target stock
+        int tgtPrev = targetProduct.getQuantity() != null ? targetProduct.getQuantity() : 0;
+        int tgtNext = tgtPrev + produced;
+        targetProduct.setQuantity(tgtNext);
+        productRepository.save(targetProduct);
+        stockLedgerService.recordManualAdjustment(
+                businessId,
+                targetProduct,
+                tgtPrev,
+                tgtNext,
+                actor.getUserId(),
+                request.getNote() != null ? request.getNote() : "Convert delivery item: produce sale units"
+        );
 
         return get(user, deliveryId);
     }

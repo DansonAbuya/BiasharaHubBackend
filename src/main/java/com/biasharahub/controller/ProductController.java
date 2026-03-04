@@ -19,6 +19,7 @@ import com.biasharahub.service.WhatsAppNotificationService;
 import com.biasharahub.service.StockLedgerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -255,6 +256,7 @@ public class ProductController {
     }
 
     @PostMapping
+    @CacheEvict(cacheNames = "publicProducts", allEntries = true)
     @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
     public ResponseEntity<?> createProduct(
             @RequestBody ProductDto dto,
@@ -292,6 +294,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
+    @CacheEvict(cacheNames = "publicProducts", allEntries = true)
     @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
     public ResponseEntity<ProductDto> updateProduct(
             @PathVariable UUID id,
@@ -341,6 +344,7 @@ public class ProductController {
      * This does not change stock; it only controls customer visibility.
      */
     @PatchMapping("/{id}/approve")
+    @CacheEvict(cacheNames = "publicProducts", allEntries = true)
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<?> approveProduct(
             @PathVariable UUID id,
@@ -367,6 +371,7 @@ public class ProductController {
      * Owner-only so pricing decisions stay with the seller.
      */
     @PatchMapping("/{id}/price-from-cost")
+    @CacheEvict(cacheNames = "publicProducts", allEntries = true)
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<?> setPriceFromCost(
             @PathVariable UUID id,
@@ -411,6 +416,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
+    @CacheEvict(cacheNames = "publicProducts", allEntries = true)
     @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
     public ResponseEntity<Void> deleteProduct(
             @PathVariable UUID id,
