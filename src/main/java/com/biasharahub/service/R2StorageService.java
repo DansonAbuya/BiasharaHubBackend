@@ -3,7 +3,7 @@ package com.biasharahub.service;
 import com.biasharahub.config.R2Config.R2Properties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -15,10 +15,11 @@ import java.util.UUID;
 
 /**
  * Uploads product images to Cloudflare R2 and returns public URLs.
+ * Enabled whenever r2.enabled=true and the S3 client bean is created.
  */
 @Service
 @RequiredArgsConstructor
-@ConditionalOnBean(S3Client.class)
+@ConditionalOnProperty(name = "r2.enabled", havingValue = "true")
 @Slf4j
 public class R2StorageService {
 
