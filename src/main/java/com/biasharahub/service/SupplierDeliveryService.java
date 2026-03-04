@@ -235,6 +235,31 @@ public class SupplierDeliveryService {
         java.util.Map<UUID, Integer> received = request != null && request.getReceivedQuantities() != null
                 ? request.getReceivedQuantities() : java.util.Map.of();
 
+        // Each dispatch is treated separately: do not add new stock until existing stock from
+        // a previous supply is cleared, so prices can differ per supply.
+        java.util.List<String> productsWithExistingStock = new java.util.ArrayList<>();
+        for (SupplierDeliveryItem item : items) {
+            Integer qty = received.get(item.getItemId());
+            int receivedQty = qty != null ? qty : (item.getQuantity() != null ? item.getQuantity() : 0);
+            if (receivedQty <= 0) continue;
+            Product product = item.getProduct();
+            if (product == null) continue;
+            int currentStock = product.getQuantity() != null ? product.getQuantity() : 0;
+            if (currentStock > 0) {
+                String name = product.getName() != null ? product.getName() : product.getProductId().toString();
+                if (!productsWithExistingStock.contains(name)) {
+                    productsWithExistingStock.add(name);
+                }
+            }
+        }
+        if (!productsWithExistingStock.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "There is a dispatch whose products are still on sale. Do not mix dispatches. "
+                            + "The following products still have stock from that dispatch: "
+                            + String.join(", ", productsWithExistingStock)
+                            + ". Sell or clear that stock before receiving this dispatch.");
+        }
+
         for (SupplierDeliveryItem item : items) {
             Integer qty = received.get(item.getItemId());
             // If client sent a non-null quantity (including 0), use it; otherwise fall back to supplier-stated quantity.
