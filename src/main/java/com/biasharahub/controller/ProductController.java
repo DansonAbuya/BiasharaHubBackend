@@ -18,6 +18,7 @@ import com.biasharahub.service.SmsNotificationService;
 import com.biasharahub.service.WhatsAppNotificationService;
 import com.biasharahub.service.StockLedgerService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +44,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/products")
 @RequiredArgsConstructor
+@Slf4j
 public class ProductController {
 
     /** Low-stock threshold for seller alerts (in-app, WhatsApp, SMS). */
@@ -59,6 +62,11 @@ public class ProductController {
 
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
+
+    @PostConstruct
+    public void logR2Availability() {
+        log.info("ProductController: r2StorageService present = {}", r2StorageService.isPresent());
+    }
 
     /** List shops (verified owners’ businesses) for marketplace. Each seller has one shop; only verified shops appear. No auth required. */
     @GetMapping("/businesses")
