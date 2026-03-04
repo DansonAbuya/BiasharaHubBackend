@@ -1,5 +1,8 @@
 package com.biasharahub.config;
 
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +20,7 @@ import java.net.URI;
  * Beans are only created when r2.enabled=true and endpoint/credentials are set.
  */
 @Configuration
+@Slf4j
 public class R2Config {
 
     @Bean
@@ -28,6 +32,12 @@ public class R2Config {
     @Bean
     @ConditionalOnProperty(name = "r2.enabled", havingValue = "true")
     public S3Client r2S3Client(R2Properties props) {
+        log.info("R2Config: r2.enabled={}, endpointConfigured={}, accessKeyIdConfigured={}, publicUrl={}",
+                props.isEnabled(),
+                props.getEndpoint() != null && !props.getEndpoint().isBlank(),
+                props.getAccessKeyId() != null && !props.getAccessKeyId().isBlank(),
+                props.getPublicUrl());
+
         if (props.getEndpoint() == null || props.getEndpoint().isBlank()
                 || props.getAccessKeyId() == null || props.getAccessKeyId().isBlank()
                 || props.getSecretAccessKey() == null || props.getSecretAccessKey().isBlank()) {
@@ -45,8 +55,8 @@ public class R2Config {
                 .build();
     }
 
-    @lombok.Getter
-    @lombok.Setter
+    @Getter
+    @Setter
     public static class R2Properties {
         private boolean enabled;
         private String bucket = "biasharahub-products";
