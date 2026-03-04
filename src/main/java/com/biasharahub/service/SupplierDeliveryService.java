@@ -320,7 +320,20 @@ public class SupplierDeliveryService {
             throw new IllegalArgumentException("Source quantity used must be greater than zero");
         }
 
-        int produced = request.getProducedQuantity() != null ? request.getProducedQuantity() : 0;
+        // Derive produced quantity from piecesPerUnit when not explicitly provided.
+        Integer explicitProduced = request.getProducedQuantity();
+        Integer piecesPerUnit = request.getPiecesPerUnit();
+        int produced;
+        if (explicitProduced != null) {
+            produced = explicitProduced;
+        } else if (piecesPerUnit != null) {
+            if (piecesPerUnit <= 0) {
+                throw new IllegalArgumentException("Pieces per unit must be greater than zero");
+            }
+            produced = sourceUsed * piecesPerUnit;
+        } else {
+            throw new IllegalArgumentException("Either produced quantity or pieces per unit must be provided");
+        }
         if (produced <= 0) {
             throw new IllegalArgumentException("Produced quantity must be greater than zero");
         }
@@ -342,13 +355,24 @@ public class SupplierDeliveryService {
             String name = request.getTargetName() != null && !request.getTargetName().isBlank()
                     ? request.getTargetName().trim()
                     : (sourceProduct.getName() != null ? sourceProduct.getName() : "Converted item");
-            if (request.getTargetPrice() == null) {
-                throw new IllegalArgumentException("Target price is required when creating a new product");
+            // If target price is not provided, derive a default from supplier unit cost and subdivision size.
+            BigDecimal targetPrice = request.getTargetPrice();
+            if (targetPrice == null) {
+                BigDecimal unitCost = item.getUnitCost();
+                if (unitCost != null && piecesPerUnit != null && piecesPerUnit > 0) {
+                    targetPrice = unitCost
+                            .divide(BigDecimal.valueOf(piecesPerUnit), 2, RoundingMode.HALF_UP);
+                } else if (unitCost != null) {
+                    // Fall back to supplier unit cost as the sale unit price.
+                    targetPrice = unitCost.setScale(2, RoundingMode.HALF_UP);
+                } else {
+                    throw new IllegalArgumentException("Cannot derive selling price: supplier cost is missing. Please provide a target price.");
+                }
             }
             targetProduct = Product.builder()
                     .businessId(businessId)
                     .name(name)
-                    .price(request.getTargetPrice())
+                    .price(targetPrice)
                     .quantity(0)
                     .build();
             targetProduct = productRepository.save(targetProduct);
