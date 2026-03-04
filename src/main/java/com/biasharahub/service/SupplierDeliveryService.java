@@ -129,6 +129,11 @@ public class SupplierDeliveryService {
             if (alreadyDispatched) {
                 throw new IllegalArgumentException("You have already submitted a dispatch for this purchase order");
             }
+            // First dispatch against this PO: mark it as SENT so it no longer appears as a draft.
+            if ("DRAFT".equalsIgnoreCase(po.getStatus())) {
+                po.setStatus("SENT");
+                purchaseOrderRepository.save(po);
+            }
         }
 
         SupplierDelivery d = SupplierDelivery.builder()
@@ -259,6 +264,16 @@ public class SupplierDeliveryService {
         d.setReceivedAt(Instant.now());
         d.setReceivedBy(actor);
         supplierDeliveryRepository.save(d);
+
+        // When a dispatch linked to a purchase order is received by the seller,
+        // mark that purchase order as fulfilled/closed.
+        if (d.getPurchaseOrder() != null) {
+            PurchaseOrder po = d.getPurchaseOrder();
+            if (!"FULFILLED".equalsIgnoreCase(po.getStatus())) {
+                po.setStatus("FULFILLED");
+                purchaseOrderRepository.save(po);
+            }
+        }
 
         return get(user, deliveryId);
     }
