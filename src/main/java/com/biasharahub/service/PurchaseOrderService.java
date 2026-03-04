@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -60,6 +61,28 @@ public class PurchaseOrderService {
             if (product == null && (itemReq.getDescription() == null || itemReq.getDescription().isBlank())) {
                 throw new IllegalArgumentException("Description is required when product is not selected");
             }
+
+            // If the seller did not select an existing product, automatically create
+            // a placeholder product for this PO line. The seller can later edit the
+            // product's customer-facing name, price and other details.
+            if (product == null) {
+                String baseDescription = itemReq.getDescription() != null ? itemReq.getDescription().trim() : "Unnamed item";
+                String name = (itemReq.getCustomerName() != null && !itemReq.getCustomerName().isBlank())
+                        ? itemReq.getCustomerName().trim()
+                        : baseDescription;
+                BigDecimal price = itemReq.getCustomerPrice() != null
+                        ? itemReq.getCustomerPrice()
+                        : (itemReq.getExpectedUnitCost() != null ? itemReq.getExpectedUnitCost() : BigDecimal.ZERO);
+                product = Product.builder()
+                        .businessId(businessId)
+                        .name(name)
+                        .price(price)
+                        .quantity(0)
+                        // moderationStatus defaults to pending_review
+                        .build();
+                product = productRepository.save(product);
+            }
+
             PurchaseOrderItem poi = PurchaseOrderItem.builder()
                     .purchaseOrder(po)
                     .product(product)
