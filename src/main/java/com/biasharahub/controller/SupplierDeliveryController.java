@@ -3,6 +3,7 @@ package com.biasharahub.controller;
 import com.biasharahub.dto.request.AddSupplierDeliveryItemRequest;
 import com.biasharahub.dto.request.ConfirmReceiptRequest;
 import com.biasharahub.dto.request.CreateSupplierDeliveryRequest;
+import com.biasharahub.dto.request.ConvertDeliveryItemRequest;
 import com.biasharahub.dto.response.SupplierDeliveryDto;
 import com.biasharahub.security.AuthenticatedUser;
 import com.biasharahub.service.SupplierDeliveryService;
@@ -66,6 +67,23 @@ public class SupplierDeliveryController {
             @Valid @RequestBody AddSupplierDeliveryItemRequest request) {
         try {
             return ResponseEntity.ok(supplierDeliveryService.addItem(user, id, request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Convert part of a received delivery item into separate sale units / product.
+     */
+    @PostMapping("/{deliveryId}/items/{itemId}/convert")
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
+    public ResponseEntity<?> convertItem(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID deliveryId,
+            @PathVariable UUID itemId,
+            @Valid @RequestBody ConvertDeliveryItemRequest request) {
+        try {
+            return ResponseEntity.ok(supplierDeliveryService.convertItem(user, deliveryId, itemId, request));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
