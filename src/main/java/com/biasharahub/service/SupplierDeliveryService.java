@@ -235,12 +235,79 @@ public class SupplierDeliveryService {
         java.util.Map<UUID, Integer> received = request != null && request.getReceivedQuantities() != null
                 ? request.getReceivedQuantities() : java.util.Map.of();
 
+        // Receipt only: record what was received; do not update product stock yet.
+        // Seller can "Add to stock" later when the previous dispatch is sold out.
         for (SupplierDeliveryItem item : items) {
             Integer qty = received.get(item.getItemId());
-            // If client sent a non-null quantity (including 0), use it; otherwise fall back to supplier-stated quantity.
             item.setReceivedQuantity(qty != null ? qty : item.getQuantity());
             supplierDeliveryItemRepository.save(item);
+        }
 
+        d.setStatus("RECEIVED");
+        d.setReceivedAt(Instant.now());
+        d.setReceivedBy(actor);
+        supplierDeliveryRepository.save(d);
+
+        // When a dispatch linked to a purchase order is received by the seller,
+        // mark that purchase order as fulfilled/closed.
+        if (d.getPurchaseOrder() != null) {
+            PurchaseOrder po = d.getPurchaseOrder();
+            if (!"FULFILLED".equalsIgnoreCase(po.getStatus())) {
+                po.setStatus("FULFILLED");
+                purchaseOrderRepository.save(po);
+            }
+        }
+
+        return get(user, deliveryId);
+    }
+
+    /**
+     * Add this delivery's received quantities to product stock. Allowed only when the delivery is RECEIVED
+     * and has not already been added, and when every product in this delivery has zero current stock
+     * (previous dispatch sold out). Do not mix dispatches.
+     */
+    @Transactional
+    public SupplierDeliveryDto addDeliveryToStock(AuthenticatedUser user, UUID deliveryId) {
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        if (!"owner".equals(role) && !"staff".equals(role)) {
+            throw new IllegalArgumentException("Only the business owner or staff can add delivery to stock");
+        }
+        UUID businessId = requireBusinessId(user);
+        SupplierDelivery d = supplierDeliveryRepository.findByIdWithParties(deliveryId)
+                .orElseThrow(() -> new IllegalArgumentException("Delivery not found"));
+        if (!businessId.equals(d.getBusinessId())) throw new IllegalArgumentException("Forbidden");
+        if (!"RECEIVED".equalsIgnoreCase(d.getStatus())) {
+            throw new IllegalArgumentException("Delivery must be received before adding to stock");
+        }
+        if (d.getStockUpdatedAt() != null) {
+            throw new IllegalArgumentException("Stock from this delivery has already been added");
+        }
+
+        List<SupplierDeliveryItem> items = supplierDeliveryItemRepository.findByDeliveryIdWithProduct(deliveryId);
+        java.util.List<String> productsWithExistingStock = new java.util.ArrayList<>();
+        for (SupplierDeliveryItem item : items) {
+            int receivedQty = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : (item.getQuantity() != null ? item.getQuantity() : 0);
+            if (receivedQty <= 0) continue;
+            Product product = item.getProduct();
+            if (product == null) continue;
+            int currentStock = product.getQuantity() != null ? product.getQuantity() : 0;
+            if (currentStock > 0) {
+                String name = product.getName() != null ? product.getName() : product.getProductId().toString();
+                if (!productsWithExistingStock.contains(name)) {
+                    productsWithExistingStock.add(name);
+                }
+            }
+        }
+        if (!productsWithExistingStock.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "There is a dispatch whose products are still on sale. Do not mix dispatches. "
+                            + "The following products still have stock from that dispatch: "
+                            + String.join(", ", productsWithExistingStock)
+                            + ". Sell or clear that stock before adding this delivery to stock.");
+        }
+
+        User actor = userRepository.findById(user.userId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
+        for (SupplierDeliveryItem item : items) {
             int qtyToAdd = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : (item.getQuantity() != null ? item.getQuantity() : 0);
             if (qtyToAdd <= 0) continue;
             Product product = item.getProduct();
@@ -259,22 +326,8 @@ public class SupplierDeliveryService {
                     d.getDeliveryNoteRef() != null ? ("Delivery note: " + d.getDeliveryNoteRef()) : null
             );
         }
-
-        d.setStatus("RECEIVED");
-        d.setReceivedAt(Instant.now());
-        d.setReceivedBy(actor);
+        d.setStockUpdatedAt(Instant.now());
         supplierDeliveryRepository.save(d);
-
-        // When a dispatch linked to a purchase order is received by the seller,
-        // mark that purchase order as fulfilled/closed.
-        if (d.getPurchaseOrder() != null) {
-            PurchaseOrder po = d.getPurchaseOrder();
-            if (!"FULFILLED".equalsIgnoreCase(po.getStatus())) {
-                po.setStatus("FULFILLED");
-                purchaseOrderRepository.save(po);
-            }
-        }
-
         return get(user, deliveryId);
     }
 
@@ -446,6 +499,7 @@ public class SupplierDeliveryService {
                 .receivedByUserId(d.getReceivedBy() != null ? d.getReceivedBy().getUserId() : null)
                 .receivedByName(d.getReceivedBy() != null ? (d.getReceivedBy().getName() != null ? d.getReceivedBy().getName() : d.getReceivedBy().getEmail()) : null)
                 .status(d.getStatus())
+                .stockUpdatedAt(d.getStockUpdatedAt())
                 .createdAt(d.getCreatedAt())
                 .items(items)
                 .totalQuantity(totalQty)

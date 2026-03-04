@@ -52,6 +52,10 @@ public class SupplierDelivery {
     @Builder.Default
     private String status = "DRAFT";
 
+    /** When non-null, received quantities from this delivery have been added to product stock (seller clicked "Add to stock"). */
+    @Column(name = "stock_updated_at")
+    private Instant stockUpdatedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id")
     private User createdBy;
