@@ -296,11 +296,24 @@ public class SupplierDeliveryService {
 
         List<SupplierDeliveryItem> items = supplierDeliveryItemRepository.findByDeliveryIdWithProduct(deliveryId);
         java.util.List<String> productsWithExistingStock = new java.util.ArrayList<>();
+        java.util.List<String> productsMissingPrice = new java.util.ArrayList<>();
         for (SupplierDeliveryItem item : items) {
             int receivedQty = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : (item.getQuantity() != null ? item.getQuantity() : 0);
-            if (receivedQty <= 0) continue;
+            int converted = item.getConvertedQuantity() != null ? item.getConvertedQuantity() : 0;
+            int remaining = receivedQty - converted;
+            if (remaining <= 0) continue;
             Product product = item.getProduct();
             if (product == null) continue;
+
+            // Require a selling price before stock can be added.
+            BigDecimal price = product.getPrice();
+            if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+                String name = product.getName() != null ? product.getName() : product.getProductId().toString();
+                if (!productsMissingPrice.contains(name)) {
+                    productsMissingPrice.add(name);
+                }
+            }
+
             int currentStock = product.getQuantity() != null ? product.getQuantity() : 0;
             if (currentStock > 0) {
                 String name = product.getName() != null ? product.getName() : product.getProductId().toString();
@@ -308,6 +321,13 @@ public class SupplierDeliveryService {
                     productsWithExistingStock.add(name);
                 }
             }
+        }
+        if (!productsMissingPrice.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "You must set a selling price before adding this delivery to stock. "
+                            + "The following products are missing a valid price: "
+                            + String.join(", ", productsMissingPrice)
+                            + ". Go to Products and set a price, then try again.");
         }
         if (!productsWithExistingStock.isEmpty()) {
             throw new IllegalArgumentException(
@@ -463,13 +483,15 @@ public class SupplierDeliveryService {
                     }
                 }
             }
-            // Converted products are customer-facing: seller will set price and owner will approve.
+            // Subdivision = customer-facing name for the same product; supplier-facing name stays on source.
+            // One supplier-facing product can have multiple customer-facing subdivisions (e.g. 500g and 1kg).
             targetProduct = Product.builder()
                     .businessId(businessId)
                     .name(name)
                     .price(targetPrice)
                     .quantity(0)
                     .supplierFacingOnly(false)
+                    .sourceProductId(sourceProduct.getProductId())
                     .build();
             targetProduct = productRepository.save(targetProduct);
         }

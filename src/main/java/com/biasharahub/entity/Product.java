@@ -57,6 +57,14 @@ public class Product {
     @Builder.Default
     private boolean supplierFacingOnly = false;
 
+    /**
+     * When set, this product is a customer-facing subdivision of the supplier-facing
+     * product identified by this ID. The supplier-facing name stays on the source product;
+     * this product's name is the customer-facing name for the subdivision.
+     */
+    @Column(name = "source_product_id")
+    private UUID sourceProductId;
+
     /** Moderation: pending_review, approved, rejected */
     @Column(name = "moderation_status", length = 32)
     @Builder.Default
