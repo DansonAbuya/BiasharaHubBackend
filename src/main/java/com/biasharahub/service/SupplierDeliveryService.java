@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -118,7 +119,7 @@ public class SupplierDeliveryService {
 
         PurchaseOrder po = null;
         if (request.getPurchaseOrderId() != null) {
-            po = purchaseOrderRepository.findById(request.getPurchaseOrderId())
+            po = purchaseOrderRepository.findByIdWithItems(request.getPurchaseOrderId())
                     .orElseThrow(() -> new IllegalArgumentException("Purchase order not found"));
             if (!businessId.equals(po.getBusinessId()) || po.getSupplier() == null
                     || !po.getSupplier().getSupplierId().equals(supplier.getSupplierId())) {
@@ -153,12 +154,21 @@ public class SupplierDeliveryService {
             if (p.getBusinessId() == null || !businessId.equals(p.getBusinessId())) {
                 throw new IllegalArgumentException("Product does not belong to the business you supply");
             }
+            String unitOfMeasure = null;
+            if (po != null && po.getItems() != null) {
+                unitOfMeasure = po.getItems().stream()
+                        .filter(pi -> p.getProductId().equals(pi.getProduct() != null ? pi.getProduct().getProductId() : null))
+                        .map(com.biasharahub.entity.PurchaseOrderItem::getUnitOfMeasure)
+                        .findFirst()
+                        .orElse(null);
+            }
             SupplierDeliveryItem item = SupplierDeliveryItem.builder()
                     .delivery(d)
                     .product(p)
                     .productName(p.getName())
                     .quantity(di.getQuantity())
                     .unitCost(di.getUnitCost())
+                    .unitOfMeasure(unitOfMeasure != null && !unitOfMeasure.isBlank() ? unitOfMeasure.trim() : null)
                     .build();
             supplierDeliveryItemRepository.save(item);
         }
@@ -203,6 +213,7 @@ public class SupplierDeliveryService {
                 .productName(p.getName())
                 .quantity(request.getQuantity())
                 .unitCost(request.getUnitCost())
+                .unitOfMeasure(request.getUnitOfMeasure() != null && !request.getUnitOfMeasure().isBlank() ? request.getUnitOfMeasure().trim() : null)
                 .build();
         supplierDeliveryItemRepository.save(item);
         return get(user, deliveryId);
@@ -373,19 +384,47 @@ public class SupplierDeliveryService {
             throw new IllegalArgumentException("Source quantity used must be greater than zero");
         }
 
-        // Derive produced quantity from piecesPerUnit when not explicitly provided.
+        // Derive produced quantity: explicit, or unit-based (targetUnitSize + targetUnit), or piecesPerUnit.
         Integer explicitProduced = request.getProducedQuantity();
         Integer piecesPerUnit = request.getPiecesPerUnit();
+        BigDecimal targetUnitSize = request.getTargetUnitSize();
+        String targetUnit = request.getTargetUnit() != null ? request.getTargetUnit().trim() : null;
+        String sourceUnit = item.getUnitOfMeasure() != null ? item.getUnitOfMeasure().trim() : null;
+
         int produced;
+        BigDecimal derivedCostPerUnit = null; // for unit-based subdivision: cost per sub-unit (no loss)
         if (explicitProduced != null) {
             produced = explicitProduced;
+        } else if (targetUnitSize != null && targetUnitSize.compareTo(BigDecimal.ZERO) > 0 && targetUnit != null && !targetUnit.isBlank()
+                && sourceUnit != null && !sourceUnit.isBlank()) {
+            // Unit-based subdivision: e.g. 10 kg → 500 g → 20 sub-units; cost per sub-unit = total cost / 20
+            BigDecimal sourceMultiplier = unitToBaseMultiplier(sourceUnit);
+            BigDecimal targetMultiplier = unitToBaseMultiplier(targetUnit);
+            if (sourceMultiplier == null || targetMultiplier == null) {
+                throw new IllegalArgumentException("Unsupported unit for subdivision. Use kg, g, L, ml, or piece.");
+            }
+            BigDecimal sourceBase = BigDecimal.valueOf(sourceUsed).multiply(sourceMultiplier);
+            BigDecimal targetBase = targetUnitSize.multiply(targetMultiplier);
+            if (targetBase.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Target unit size must be greater than zero");
+            }
+            produced = sourceBase.divide(targetBase, 0, RoundingMode.DOWN).intValue();
+            if (produced <= 0) {
+                throw new IllegalArgumentException("Subdivision yields no units: source quantity in target unit is less than one sub-unit size");
+            }
+            BigDecimal totalCost = item.getUnitCost() != null
+                    ? item.getUnitCost().multiply(BigDecimal.valueOf(sourceUsed)).setScale(2, RoundingMode.HALF_UP)
+                    : null;
+            if (totalCost != null && totalCost.compareTo(BigDecimal.ZERO) > 0) {
+                derivedCostPerUnit = totalCost.divide(BigDecimal.valueOf(produced), 2, RoundingMode.HALF_UP);
+            }
         } else if (piecesPerUnit != null) {
             if (piecesPerUnit <= 0) {
                 throw new IllegalArgumentException("Pieces per unit must be greater than zero");
             }
             produced = sourceUsed * piecesPerUnit;
         } else {
-            throw new IllegalArgumentException("Either produced quantity or pieces per unit must be provided");
+            throw new IllegalArgumentException("Provide produced quantity, or pieces per unit, or target unit size + target unit (e.g. 500 and g for 500 g sub-units)");
         }
         if (produced <= 0) {
             throw new IllegalArgumentException("Produced quantity must be greater than zero");
@@ -408,18 +447,21 @@ public class SupplierDeliveryService {
             String name = request.getTargetName() != null && !request.getTargetName().isBlank()
                     ? request.getTargetName().trim()
                     : (sourceProduct.getName() != null ? sourceProduct.getName() : "Converted item");
-            // If target price is not provided, derive a default from supplier unit cost and subdivision size.
+            // If target price is not provided, derive a default from supplier cost and subdivision (no loss).
             BigDecimal targetPrice = request.getTargetPrice();
             if (targetPrice == null) {
-                BigDecimal unitCost = item.getUnitCost();
-                if (unitCost != null && piecesPerUnit != null && piecesPerUnit > 0) {
-                    targetPrice = unitCost
-                            .divide(BigDecimal.valueOf(piecesPerUnit), 2, RoundingMode.HALF_UP);
-                } else if (unitCost != null) {
-                    // Fall back to supplier unit cost as the sale unit price.
-                    targetPrice = unitCost.setScale(2, RoundingMode.HALF_UP);
+                if (derivedCostPerUnit != null) {
+                    targetPrice = derivedCostPerUnit; // unit-based: cost per sub-unit
                 } else {
-                    throw new IllegalArgumentException("Cannot derive selling price: supplier cost is missing. Please provide a target price.");
+                    BigDecimal unitCost = item.getUnitCost();
+                    if (unitCost != null && piecesPerUnit != null && piecesPerUnit > 0) {
+                        targetPrice = unitCost
+                                .divide(BigDecimal.valueOf(piecesPerUnit), 2, RoundingMode.HALF_UP);
+                    } else if (unitCost != null) {
+                        targetPrice = unitCost.setScale(2, RoundingMode.HALF_UP);
+                    } else {
+                        throw new IllegalArgumentException("Cannot derive selling price: supplier cost is missing. Please provide a target price.");
+                    }
                 }
             }
             targetProduct = Product.builder()
@@ -525,11 +567,51 @@ public class SupplierDeliveryService {
                 .quantity(i.getQuantity())
                 .receivedQuantity(i.getReceivedQuantity())
                 .unitCost(i.getUnitCost())
+                .unitOfMeasure(i.getUnitOfMeasure())
                 .lineTotal(lineTotal)
                 .receivedLineTotal(receivedLineTotal)
                 .productPrice(productPrice)
                 .createdAt(i.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Multiplier to convert 1 unit to base (grams for weight, ml for volume, 1 for piece).
+     * Used for unit-based subdivision so e.g. 10 kg → 500 g gives 20 sub-units.
+     */
+    private static BigDecimal unitToBaseMultiplier(String unit) {
+        if (unit == null || unit.isBlank()) return null;
+        String u = unit.trim().toLowerCase(Locale.ROOT);
+        switch (u) {
+            case "kg":
+            case "kilogram":
+            case "kilograms":
+                return new BigDecimal("1000");
+            case "g":
+            case "gram":
+            case "grams":
+                return BigDecimal.ONE;
+            case "l":
+            case "liter":
+            case "litre":
+            case "liters":
+            case "litres":
+                return new BigDecimal("1000");
+            case "ml":
+            case "milliliter":
+            case "millilitre":
+            case "milliliters":
+            case "millilitres":
+                return BigDecimal.ONE;
+            case "piece":
+            case "pieces":
+            case "unit":
+            case "units":
+            case "pcs":
+                return BigDecimal.ONE;
+            default:
+                return null;
+        }
     }
 }
 

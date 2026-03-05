@@ -45,6 +45,10 @@ public class SupplierDeliveryItem {
     @Column(name = "unit_cost", precision = 15, scale = 2)
     private BigDecimal unitCost;
 
+    /** Unit of measure for quantity (e.g. kg, g, L, piece). Visible to seller for pricing and subdivision. */
+    @Column(name = "unit_of_measure", length = 32)
+    private String unitOfMeasure;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
