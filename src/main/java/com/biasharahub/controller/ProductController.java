@@ -268,6 +268,24 @@ public class ProductController {
         return verifiedBusinessIds.contains(product.getBusinessId());
     }
 
+    /** List existing subdivisions for a parent product (for reuse on subsequent dispatches). Owner/staff only. */
+    @GetMapping("/subdivisions")
+    @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
+    public ResponseEntity<List<ProductDto>> listSubdivisionsForSource(
+            @RequestParam UUID sourceProductId,
+            @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        UUID businessId = getBusinessId(currentUser);
+        if (businessId == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        // Ensure the source product belongs to the business
+        if (productRepository.findByProductIdAndBusinessId(sourceProductId, businessId).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        List<Product> subdivisions = productRepository.findByBusinessIdAndSourceProductIdOrderByNameAsc(businessId, sourceProductId);
+        return ResponseEntity.ok(subdivisions.stream().map(this::toDto).collect(Collectors.toList()));
+    }
+
     @PostMapping
     @CacheEvict(cacheNames = "publicProducts", allEntries = true)
     @PreAuthorize("hasAnyRole('OWNER', 'STAFF')")
