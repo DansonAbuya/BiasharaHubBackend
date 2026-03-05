@@ -319,7 +319,9 @@ public class SupplierDeliveryService {
 
         User actor = userRepository.findById(user.userId()).orElseThrow(() -> new IllegalArgumentException("User not found"));
         for (SupplierDeliveryItem item : items) {
-            int qtyToAdd = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : (item.getQuantity() != null ? item.getQuantity() : 0);
+            int receivedQty = item.getReceivedQuantity() != null ? item.getReceivedQuantity() : (item.getQuantity() != null ? item.getQuantity() : 0);
+            int converted = item.getConvertedQuantity() != null ? item.getConvertedQuantity() : 0;
+            int qtyToAdd = receivedQty - converted;
             if (qtyToAdd <= 0) continue;
             Product product = item.getProduct();
             int prev = product.getQuantity() != null ? product.getQuantity() : 0;
@@ -379,7 +381,9 @@ public class SupplierDeliveryService {
         int baseReceived = item.getReceivedQuantity() != null
                 ? item.getReceivedQuantity()
                 : (item.getQuantity() != null ? item.getQuantity() : 0);
-        int sourceUsed = request.getSourceQuantityUsed() != null ? request.getSourceQuantityUsed() : baseReceived;
+        int convertedAlready = item.getConvertedQuantity() != null ? item.getConvertedQuantity() : 0;
+        int remainingForConversion = baseReceived - convertedAlready;
+        int sourceUsed = request.getSourceQuantityUsed() != null ? request.getSourceQuantityUsed() : remainingForConversion;
         if (sourceUsed <= 0) {
             throw new IllegalArgumentException("Source quantity used must be greater than zero");
         }
@@ -430,11 +434,6 @@ public class SupplierDeliveryService {
             throw new IllegalArgumentException("Produced quantity must be greater than zero");
         }
 
-        int sourceCurrentQty = sourceProduct.getQuantity() != null ? sourceProduct.getQuantity() : 0;
-        if (sourceUsed > sourceCurrentQty) {
-            throw new IllegalArgumentException("Not enough stock on the source product to convert");
-        }
-
         // Determine or create target product
         Product targetProduct;
         if (request.getTargetProductId() != null) {
@@ -473,21 +472,38 @@ public class SupplierDeliveryService {
             targetProduct = productRepository.save(targetProduct);
         }
 
-        // Decrease source stock
-        int srcPrev = sourceCurrentQty;
-        int srcNext = srcPrev - sourceUsed;
-        sourceProduct.setQuantity(srcNext);
-        productRepository.save(sourceProduct);
-        stockLedgerService.recordManualAdjustment(
-                businessId,
-                sourceProduct,
-                srcPrev,
-                srcNext,
-                actor.getUserId(),
-                request.getNote() != null ? request.getNote() : "Convert delivery item: consume source quantity"
-        );
+        // If stock has not yet been added for this delivery, we only track how much
+        // of the received quantity has been converted, and we create/increase stock
+        // on the target product. The original product will receive only the
+        // remaining quantity when addDeliveryToStock is called.
+        if (delivery.getStockUpdatedAt() == null) {
+            int newConverted = convertedAlready + sourceUsed;
+            if (newConverted > baseReceived) {
+                throw new IllegalArgumentException("You can only convert up to the received quantity for this delivery item");
+            }
+            item.setConvertedQuantity(newConverted);
+            supplierDeliveryItemRepository.save(item);
+        } else {
+            // Stock already added: decrease source stock now and move into target product.
+            int sourceCurrentQty = sourceProduct.getQuantity() != null ? sourceProduct.getQuantity() : 0;
+            if (sourceUsed > sourceCurrentQty) {
+                throw new IllegalArgumentException("Not enough stock on the source product to convert");
+            }
+            int srcPrev = sourceCurrentQty;
+            int srcNext = srcPrev - sourceUsed;
+            sourceProduct.setQuantity(srcNext);
+            productRepository.save(sourceProduct);
+            stockLedgerService.recordManualAdjustment(
+                    businessId,
+                    sourceProduct,
+                    srcPrev,
+                    srcNext,
+                    actor.getUserId(),
+                    request.getNote() != null ? request.getNote() : "Convert delivery item: consume source quantity"
+            );
+        }
 
-        // Increase target stock
+        // Increase target stock (new sale units are available immediately)
         int tgtPrev = targetProduct.getQuantity() != null ? targetProduct.getQuantity() : 0;
         int tgtNext = tgtPrev + produced;
         targetProduct.setQuantity(tgtNext);
@@ -568,6 +584,7 @@ public class SupplierDeliveryService {
                 .receivedQuantity(i.getReceivedQuantity())
                 .unitCost(i.getUnitCost())
                 .unitOfMeasure(i.getUnitOfMeasure())
+                .convertedQuantity(i.getConvertedQuantity())
                 .lineTotal(lineTotal)
                 .receivedLineTotal(receivedLineTotal)
                 .productPrice(productPrice)
