@@ -80,11 +80,14 @@ public class PurchaseOrderService {
                 BigDecimal price = itemReq.getCustomerPrice() != null
                         ? itemReq.getCustomerPrice()
                         : (itemReq.getExpectedUnitCost() != null ? itemReq.getExpectedUnitCost() : BigDecimal.ZERO);
+                // This product is used to talk to the supplier (unit, description),
+                // not directly as a customer-facing item.
                 product = Product.builder()
                         .businessId(businessId)
                         .name(name)
                         .price(price)
                         .quantity(0)
+                        .supplierFacingOnly(true)
                         // moderationStatus defaults to pending_review
                         .build();
                 product = productRepository.save(product);
