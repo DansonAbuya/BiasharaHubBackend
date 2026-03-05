@@ -454,7 +454,7 @@ public class SupplierDeliveryService {
             throw new IllegalArgumentException("Produced quantity must be greater than zero");
         }
 
-        // Determine or create target product
+        // Determine or create target product. Reuse existing subdivision of same parent + name for subsequent dispatches.
         Product targetProduct;
         if (request.getTargetProductId() != null) {
             targetProduct = productRepository.findById(request.getTargetProductId())
@@ -466,34 +466,39 @@ public class SupplierDeliveryService {
             String name = request.getTargetName() != null && !request.getTargetName().isBlank()
                     ? request.getTargetName().trim()
                     : (sourceProduct.getName() != null ? sourceProduct.getName() : "Converted item");
-            // If target price is not provided, derive a default from supplier cost and subdivision (no loss).
-            BigDecimal targetPrice = request.getTargetPrice();
-            if (targetPrice == null) {
-                if (derivedCostPerUnit != null) {
-                    targetPrice = derivedCostPerUnit; // unit-based: cost per sub-unit
-                } else {
-                    BigDecimal unitCost = item.getUnitCost();
-                    if (unitCost != null && piecesPerUnit != null && piecesPerUnit > 0) {
-                        targetPrice = unitCost
-                                .divide(BigDecimal.valueOf(piecesPerUnit), 2, RoundingMode.HALF_UP);
-                    } else if (unitCost != null) {
-                        targetPrice = unitCost.setScale(2, RoundingMode.HALF_UP);
+            // Reuse existing subdivision for this parent + name if present (same subdivision across dispatches unless user creates/updates).
+            targetProduct = productRepository.findFirstByBusinessIdAndSourceProductIdAndNameIgnoreCase(
+                    businessId, sourceProduct.getProductId(), name).orElse(null);
+            if (targetProduct == null) {
+                // If target price is not provided, derive a default from supplier cost and subdivision (no loss).
+                BigDecimal targetPrice = request.getTargetPrice();
+                if (targetPrice == null) {
+                    if (derivedCostPerUnit != null) {
+                        targetPrice = derivedCostPerUnit; // unit-based: cost per sub-unit
                     } else {
-                        throw new IllegalArgumentException("Cannot derive selling price: supplier cost is missing. Please provide a target price.");
+                        BigDecimal unitCost = item.getUnitCost();
+                        if (unitCost != null && piecesPerUnit != null && piecesPerUnit > 0) {
+                            targetPrice = unitCost
+                                    .divide(BigDecimal.valueOf(piecesPerUnit), 2, RoundingMode.HALF_UP);
+                        } else if (unitCost != null) {
+                            targetPrice = unitCost.setScale(2, RoundingMode.HALF_UP);
+                        } else {
+                            throw new IllegalArgumentException("Cannot derive selling price: supplier cost is missing. Please provide a target price.");
+                        }
                     }
                 }
+                // Subdivision = customer-facing name for the same product; supplier-facing name stays on source.
+                // One supplier-facing product can have multiple customer-facing subdivisions (e.g. 500g and 1kg).
+                targetProduct = Product.builder()
+                        .businessId(businessId)
+                        .name(name)
+                        .price(targetPrice)
+                        .quantity(0)
+                        .supplierFacingOnly(false)
+                        .sourceProductId(sourceProduct.getProductId())
+                        .build();
+                targetProduct = productRepository.save(targetProduct);
             }
-            // Subdivision = customer-facing name for the same product; supplier-facing name stays on source.
-            // One supplier-facing product can have multiple customer-facing subdivisions (e.g. 500g and 1kg).
-            targetProduct = Product.builder()
-                    .businessId(businessId)
-                    .name(name)
-                    .price(targetPrice)
-                    .quantity(0)
-                    .supplierFacingOnly(false)
-                    .sourceProductId(sourceProduct.getProductId())
-                    .build();
-            targetProduct = productRepository.save(targetProduct);
         }
 
         // If stock has not yet been added for this delivery, we only track how much
@@ -574,11 +579,21 @@ public class SupplierDeliveryService {
         BigDecimal totalReceivedCost = items.stream()
                 .map(it -> it.getReceivedLineTotal() != null ? it.getReceivedLineTotal() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Potential revenue is based on the quantities that will actually be sold:
+        // - For original supplier-facing items, only the unconverted quantity
+        //   (received − converted) is counted.
+        // - For subdivision items, convertedQuantity is null/0, so their full
+        //   received quantity is counted.
         BigDecimal potentialRevenue = BigDecimal.ZERO;
         for (SupplierDeliveryItemDto it : items) {
-            int rq = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : 0;
+            int baseQty = it.getReceivedQuantity() != null
+                    ? it.getReceivedQuantity()
+                    : (it.getQuantity() != null ? it.getQuantity() : 0);
+            int converted = it.getConvertedQuantity() != null ? it.getConvertedQuantity() : 0;
+            int saleQty = Math.max(baseQty - converted, 0);
             BigDecimal pp = it.getProductPrice() != null ? it.getProductPrice() : BigDecimal.ZERO;
-            potentialRevenue = potentialRevenue.add(pp.multiply(BigDecimal.valueOf(rq)));
+            potentialRevenue = potentialRevenue.add(pp.multiply(BigDecimal.valueOf(saleQty)));
         }
         BigDecimal profitLoss = potentialRevenue.subtract(totalReceivedCost);
 

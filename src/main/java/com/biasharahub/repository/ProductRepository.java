@@ -39,5 +39,12 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images WHERE p.productId = :productId AND p.businessId = :businessId")
     Optional<Product> findByProductIdAndBusinessId(@Param("productId") UUID productId, @Param("businessId") UUID businessId);
 
+    /** Find an existing subdivision of a parent product by name (for reuse across dispatches). */
+    Optional<Product> findFirstByBusinessIdAndSourceProductIdAndNameIgnoreCase(
+            UUID businessId, UUID sourceProductId, String name);
+
+    /** List all subdivisions (customer-facing products) for a given parent product. */
+    List<Product> findByBusinessIdAndSourceProductIdOrderByNameAsc(UUID businessId, UUID sourceProductId);
+
     boolean existsByProductIdAndBusinessId(UUID productId, UUID businessId);
 }
