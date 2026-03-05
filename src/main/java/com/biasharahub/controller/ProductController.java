@@ -532,6 +532,7 @@ public class ProductController {
                 .images(images)
                 .businessId(p.getBusinessId() != null ? p.getBusinessId().toString() : null)
                 .moderationStatus(p.getModerationStatus())
+                .sourceProductId(p.getSourceProductId())
                 .build();
     }
 }

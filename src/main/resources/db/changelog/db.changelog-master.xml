@@ -73,5 +73,8 @@
     <include file="db/changelog/changes/067-add-converted-quantity-to-create-tenant-schema.sql"/>
     <include file="db/changelog/changes/068-add-supplier-facing-only-to-products.sql"/>
     <include file="db/changelog/changes/069-add-supplier-facing-only-to-create-tenant-schema.sql"/>
+    <include file="db/changelog/changes/070-add-food-and-beverages-product-category.sql"/>
+    <include file="db/changelog/changes/071-add-source-product-id-to-products.sql"/>
+    <include file="db/changelog/changes/072-add-source-product-id-to-create-tenant-schema.sql"/>
 
 </databaseChangeLog>

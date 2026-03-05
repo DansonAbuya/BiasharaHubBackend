@@ -28,4 +28,6 @@ public class ProductDto implements Serializable {
     private List<String> images;
     private String businessId;
     private String moderationStatus;
+    /** When set, this product is a customer-facing subdivision of the supplier-facing product with this ID. */
+    private UUID sourceProductId;
 }
