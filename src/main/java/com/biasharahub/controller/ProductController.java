@@ -160,7 +160,12 @@ public class ProductController {
                 products = category != null && !category.isBlank()
                         ? productRepository.findByBusinessIdInAndCategory(businessIds, category)
                         : productRepository.findByBusinessIdIn(businessIds);
-                // No moderation filter — they see all their products in Seller Center
+                // Hide supplier-facing-only products from Seller Center/Product list;
+                // these are internal (e.g. created from purchase orders) and not meant
+                // to be marked as ready for sale.
+                products = products.stream()
+                        .filter(p -> !p.isSupplierFacingOnly())
+                        .toList();
             }
         } else {
             // Customers / anonymous: apply request filters, then restrict to verified + approved (storefront)

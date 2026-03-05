@@ -48,6 +48,15 @@ public class Product {
     @Column(name = "business_id")
     private UUID businessId;
 
+    /**
+     * When true, this product is only used for supplier-facing flows
+     * (e.g. created from purchase orders) and should not appear on the
+     * seller's Products page as a customer-facing item.
+     */
+    @Column(name = "supplier_facing_only", nullable = false)
+    @Builder.Default
+    private boolean supplierFacingOnly = false;
+
     /** Moderation: pending_review, approved, rejected */
     @Column(name = "moderation_status", length = 32)
     @Builder.Default
