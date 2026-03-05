@@ -33,6 +33,8 @@ public class SupplierDeliveryItemDto {
     private BigDecimal receivedLineTotal;
     /** Current product selling price (for P&L: potential revenue = receivedQty × productPrice). */
     private BigDecimal productPrice;
+    /** True when this item is a subdivision (customer-facing) of another product; false for original dispatch line. */
+    private Boolean isSubdivision;
     private Instant createdAt;
 }
 
