@@ -25,6 +25,8 @@ public class SupplierDeliveryItemDto {
     private BigDecimal unitCost;
     /** Unit of measure for quantity (e.g. kg, g, piece). */
     private String unitOfMeasure;
+    /** Quantity already consumed by conversions before stock is added. */
+    private Integer convertedQuantity;
     /** Line total: quantity × unitCost (supplier stated). */
     private BigDecimal lineTotal;
     /** Received line total: receivedQuantity × unitCost (for P&L). */

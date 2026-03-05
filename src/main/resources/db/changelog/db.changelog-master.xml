@@ -69,5 +69,7 @@
     <include file="db/changelog/changes/063-add-stock-updated-at-to-create-tenant-schema.sql"/>
     <include file="db/changelog/changes/064-add-unit-of-measure-to-supplier-delivery-items.sql"/>
     <include file="db/changelog/changes/065-add-unit-of-measure-to-create-tenant-schema.sql"/>
+    <include file="db/changelog/changes/066-add-converted-quantity-to-supplier-delivery-items.sql"/>
+    <include file="db/changelog/changes/067-add-converted-quantity-to-create-tenant-schema.sql"/>
 
 </databaseChangeLog>

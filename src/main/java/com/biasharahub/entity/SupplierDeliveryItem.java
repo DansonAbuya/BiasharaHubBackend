@@ -49,6 +49,14 @@ public class SupplierDeliveryItem {
     @Column(name = "unit_of_measure", length = 32)
     private String unitOfMeasure;
 
+    /**
+     * How much of this item's received quantity has been consumed by conversions
+     * before stock is added. Used so we can convert on the delivery first, then
+     * add only the remaining quantity to stock.
+     */
+    @Column(name = "converted_quantity")
+    private Integer convertedQuantity;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
