@@ -194,7 +194,7 @@ public class SupplierDeliveryService {
                 .createdBy(actor)
                 .build();
         d = supplierDeliveryRepository.save(d);
-        return toDto(d, List.of());
+        return toDto(d, List.of(), false);
     }
 
     @Transactional
