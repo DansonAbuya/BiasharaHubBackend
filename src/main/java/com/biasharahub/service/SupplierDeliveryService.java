@@ -463,19 +463,21 @@ public class SupplierDeliveryService {
                     }
                 }
             }
+            // Converted products are customer-facing: seller will set price and owner will approve.
             targetProduct = Product.builder()
                     .businessId(businessId)
                     .name(name)
                     .price(targetPrice)
                     .quantity(0)
+                    .supplierFacingOnly(false)
                     .build();
             targetProduct = productRepository.save(targetProduct);
         }
 
         // If stock has not yet been added for this delivery, we only track how much
-        // of the received quantity has been converted, and we create/increase stock
-        // on the target product. The original product will receive only the
-        // remaining quantity when addDeliveryToStock is called.
+        // of the received quantity has been converted on the source item, and we
+        // create a new delivery item for the target product. Stock will actually be
+        // added for both source and target products when addDeliveryToStock is called.
         if (delivery.getStockUpdatedAt() == null) {
             int newConverted = convertedAlready + sourceUsed;
             if (newConverted > baseReceived) {
@@ -483,6 +485,18 @@ public class SupplierDeliveryService {
             }
             item.setConvertedQuantity(newConverted);
             supplierDeliveryItemRepository.save(item);
+
+            // Create a delivery item representing the subdivided sale units.
+            SupplierDeliveryItem convertedItem = SupplierDeliveryItem.builder()
+                    .delivery(delivery)
+                    .product(targetProduct)
+                    .productName(targetProduct.getName())
+                    .quantity(produced)
+                    .receivedQuantity(produced)
+                    .unitCost(derivedCostPerUnit != null ? derivedCostPerUnit : item.getUnitCost())
+                    .unitOfMeasure(targetUnit != null && !targetUnit.isBlank() ? targetUnit : item.getUnitOfMeasure())
+                    .build();
+            supplierDeliveryItemRepository.save(convertedItem);
         } else {
             // Stock already added: decrease source stock now and move into target product.
             int sourceCurrentQty = sourceProduct.getQuantity() != null ? sourceProduct.getQuantity() : 0;
@@ -503,19 +517,21 @@ public class SupplierDeliveryService {
             );
         }
 
-        // Increase target stock (new sale units are available immediately)
-        int tgtPrev = targetProduct.getQuantity() != null ? targetProduct.getQuantity() : 0;
-        int tgtNext = tgtPrev + produced;
-        targetProduct.setQuantity(tgtNext);
-        productRepository.save(targetProduct);
-        stockLedgerService.recordManualAdjustment(
-                businessId,
-                targetProduct,
-                tgtPrev,
-                tgtNext,
-                actor.getUserId(),
-                request.getNote() != null ? request.getNote() : "Convert delivery item: produce sale units"
-        );
+        // Increase target stock only when stock for this delivery has already been added.
+        if (delivery.getStockUpdatedAt() != null) {
+            int tgtPrev = targetProduct.getQuantity() != null ? targetProduct.getQuantity() : 0;
+            int tgtNext = tgtPrev + produced;
+            targetProduct.setQuantity(tgtNext);
+            productRepository.save(targetProduct);
+            stockLedgerService.recordManualAdjustment(
+                    businessId,
+                    targetProduct,
+                    tgtPrev,
+                    tgtNext,
+                    actor.getUserId(),
+                    request.getNote() != null ? request.getNote() : "Convert delivery item: produce sale units"
+            );
+        }
 
         return get(user, deliveryId);
     }
