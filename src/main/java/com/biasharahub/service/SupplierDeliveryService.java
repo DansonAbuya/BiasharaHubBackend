@@ -43,6 +43,9 @@ public class SupplierDeliveryService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final UserRepository userRepository;
     private final StockLedgerService stockLedgerService;
+    private final MailService mailService;
+    private final InAppNotificationService inAppNotificationService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
 
     @Transactional(readOnly = true)
     public List<SupplierDeliveryDto> listMyBusinessDeliveries(AuthenticatedUser user) {
@@ -54,7 +57,7 @@ public class SupplierDeliveryService {
                             .stream()
                             .map(this::toItemDto)
                             .collect(Collectors.toList());
-                    return toDto(d, items);
+                    return toDto(d, items, false); // seller view: originals before subdivision, subdivisions after
                 })
                 .collect(Collectors.toList());
     }
@@ -86,7 +89,7 @@ public class SupplierDeliveryService {
                             .stream()
                             .map(this::toItemDto)
                             .collect(Collectors.toList());
-                    return toDto(d, items);
+                    return toDto(d, items, true); // supplier view: original products only, no subdivisions
                 })
                 .collect(Collectors.toList());
     }
@@ -99,7 +102,8 @@ public class SupplierDeliveryService {
         if (!businessId.equals(d.getBusinessId())) throw new IllegalArgumentException("Forbidden");
         List<SupplierDeliveryItemDto> items = supplierDeliveryItemRepository.findByDeliveryIdWithProduct(deliveryId)
                 .stream().map(this::toItemDto).collect(Collectors.toList());
-        return toDto(d, items);
+        boolean forSupplierView = user.role() != null && "supplier".equalsIgnoreCase(user.role());
+        return toDto(d, items, forSupplierView);
     }
 
     /**
@@ -172,7 +176,35 @@ public class SupplierDeliveryService {
                     .build();
             supplierDeliveryItemRepository.save(item);
         }
+
+        // Notify seller: email, in-app, WhatsApp
+        try {
+            inAppNotificationService.notifySellerSupplierDispatched(d);
+        } catch (Exception e) { /* continue */ }
+        try {
+            whatsAppNotificationService.notifySellerSupplierDispatched(d);
+        } catch (Exception e) { /* continue */ }
+        notifySellerSupplierDispatchedEmail(d);
+
         return get(user, d.getDeliveryId());
+    }
+
+    private void notifySellerSupplierDispatchedEmail(SupplierDelivery d) {
+        if (d == null || d.getBusinessId() == null) return;
+        java.util.List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", d.getBusinessId());
+        java.util.List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", d.getBusinessId());
+        String supplierName = d.getSupplier() != null ? d.getSupplier().getName() : null;
+        String poNumber = d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null;
+        java.util.stream.Stream.concat(
+                owners != null ? owners.stream() : java.util.stream.Stream.empty(),
+                staff != null ? staff.stream() : java.util.stream.Stream.empty()
+        ).filter(u -> u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus()))
+                .filter(u -> u.getEmail() != null && !u.getEmail().isBlank())
+                .forEach(u -> {
+                    try {
+                        mailService.sendSupplierDispatchedToSeller(u.getEmail(), u.getName() != null ? u.getName() : "Seller", supplierName, poNumber);
+                    } catch (Exception e) { /* skip */ }
+                });
     }
 
     @Transactional
@@ -193,7 +225,7 @@ public class SupplierDeliveryService {
                 .createdBy(actor)
                 .build();
         d = supplierDeliveryRepository.save(d);
-        return toDto(d, List.of());
+        return toDto(d, List.of(), false);
     }
 
     @Transactional
@@ -267,6 +299,21 @@ public class SupplierDeliveryService {
                 po.setStatus("FULFILLED");
                 purchaseOrderRepository.save(po);
             }
+        }
+
+        // Notify supplier: email, in-app, WhatsApp
+        try {
+            inAppNotificationService.notifySupplierDispatchReceiptConfirmed(d);
+        } catch (Exception e) { /* continue */ }
+        try {
+            whatsAppNotificationService.notifySupplierDispatchReceiptConfirmed(d);
+        } catch (Exception e) { /* continue */ }
+        Supplier sup = d.getSupplier();
+        if (sup != null && sup.getEmail() != null && !sup.getEmail().isBlank()) {
+            try {
+                String poNumber = d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null;
+                mailService.sendDispatchReceiptConfirmedToSupplier(sup.getEmail().trim(), sup.getName() != null ? sup.getName() : "Supplier", poNumber);
+            } catch (Exception e) { /* continue */ }
         }
 
         return get(user, deliveryId);
@@ -571,56 +618,70 @@ public class SupplierDeliveryService {
                 .orElseThrow(() -> new IllegalArgumentException("Business not set"));
     }
 
-    private SupplierDeliveryDto toDto(SupplierDelivery d, List<SupplierDeliveryItemDto> items) {
-        int totalQty = items.stream().mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 0).sum();
+    private SupplierDeliveryDto toDto(SupplierDelivery d, List<SupplierDeliveryItemDto> items, boolean forSupplierView) {
+        // Supply quantity and supply cost: only original (non-subdivision) items — what the supplier actually sent.
+        int totalQty = items.stream()
+                .filter(it -> !Boolean.TRUE.equals(it.getIsSubdivision()))
+                .mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 0)
+                .sum();
         BigDecimal totalCost = items.stream()
+                .filter(it -> !Boolean.TRUE.equals(it.getIsSubdivision()))
                 .map(it -> it.getLineTotal() != null ? it.getLineTotal() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Total received cost: count each cost once. For originals use only unconverted qty × unitCost;
-        // for subdivisions use their receivedLineTotal (cost of the converted portion). Avoids double-counting.
-        BigDecimal totalReceivedCost = BigDecimal.ZERO;
-        for (SupplierDeliveryItemDto it : items) {
-            if (Boolean.TRUE.equals(it.getIsSubdivision())) {
-                totalReceivedCost = totalReceivedCost.add(it.getReceivedLineTotal() != null ? it.getReceivedLineTotal() : BigDecimal.ZERO);
-            } else {
-                int baseQty = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : (it.getQuantity() != null ? it.getQuantity() : 0);
-                int converted = it.getConvertedQuantity() != null ? it.getConvertedQuantity() : 0;
-                int unconverted = Math.max(baseQty - converted, 0);
-                BigDecimal uc = it.getUnitCost() != null ? it.getUnitCost() : BigDecimal.ZERO;
-                totalReceivedCost = totalReceivedCost.add(uc.multiply(BigDecimal.valueOf(unconverted)));
+        BigDecimal totalReceivedCost;
+        BigDecimal potentialRevenue;
+        List<SupplierDeliveryItemDto> displayItems;
+
+        if (forSupplierView) {
+            // Supplier sees only original products (what they dispatched). No subdivisions.
+            displayItems = items.stream()
+                    .filter(it -> !Boolean.TRUE.equals(it.getIsSubdivision()))
+                    .collect(Collectors.toList());
+            totalReceivedCost = displayItems.stream()
+                    .map(it -> it.getReceivedLineTotal() != null ? it.getReceivedLineTotal() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            potentialRevenue = BigDecimal.ZERO;
+            for (SupplierDeliveryItemDto it : displayItems) {
+                int rq = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : (it.getQuantity() != null ? it.getQuantity() : 0);
+                BigDecimal pp = it.getProductPrice() != null ? it.getProductPrice() : BigDecimal.ZERO;
+                potentialRevenue = potentialRevenue.add(pp.multiply(BigDecimal.valueOf(rq)));
             }
-        }
-
-        // Potential revenue is based on the quantities that will actually be sold:
-        // - For original supplier-facing items, only the unconverted quantity
-        //   (received − converted) is counted.
-        // - For subdivision items, convertedQuantity is null/0, so their full
-        //   received quantity is counted.
-        BigDecimal potentialRevenue = BigDecimal.ZERO;
-        for (SupplierDeliveryItemDto it : items) {
-            int baseQty = it.getReceivedQuantity() != null
-                    ? it.getReceivedQuantity()
-                    : (it.getQuantity() != null ? it.getQuantity() : 0);
-            int converted = it.getConvertedQuantity() != null ? it.getConvertedQuantity() : 0;
-            int saleQty = Math.max(baseQty - converted, 0);
-            BigDecimal pp = it.getProductPrice() != null ? it.getProductPrice() : BigDecimal.ZERO;
-            potentialRevenue = potentialRevenue.add(pp.multiply(BigDecimal.valueOf(saleQty)));
-        }
-        BigDecimal profitLoss = potentialRevenue.subtract(totalReceivedCost);
-
-        // For display: exclude original (non-subdivision) items that are fully converted,
-        // so we only show subdivision lines and originals that still have unconverted qty.
-        // P&L above uses the full list; display uses this filtered list to avoid double-counting in the UI.
-        List<SupplierDeliveryItemDto> displayItems = items.stream()
-                .filter(it -> {
-                    boolean subdivision = Boolean.TRUE.equals(it.getIsSubdivision());
+        } else {
+            // Seller (receiving) view: total received cost and P&L count each cost/revenue once (no double-count).
+            totalReceivedCost = BigDecimal.ZERO;
+            for (SupplierDeliveryItemDto it : items) {
+                if (Boolean.TRUE.equals(it.getIsSubdivision())) {
+                    totalReceivedCost = totalReceivedCost.add(it.getReceivedLineTotal() != null ? it.getReceivedLineTotal() : BigDecimal.ZERO);
+                } else {
                     int baseQty = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : (it.getQuantity() != null ? it.getQuantity() : 0);
                     int converted = it.getConvertedQuantity() != null ? it.getConvertedQuantity() : 0;
-                    int saleQty = Math.max(baseQty - converted, 0);
-                    return subdivision || saleQty > 0;
-                })
-                .collect(Collectors.toList());
+                    int unconverted = Math.max(baseQty - converted, 0);
+                    BigDecimal uc = it.getUnitCost() != null ? it.getUnitCost() : BigDecimal.ZERO;
+                    totalReceivedCost = totalReceivedCost.add(uc.multiply(BigDecimal.valueOf(unconverted)));
+                }
+            }
+            potentialRevenue = BigDecimal.ZERO;
+            for (SupplierDeliveryItemDto it : items) {
+                int baseQty = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : (it.getQuantity() != null ? it.getQuantity() : 0);
+                int converted = it.getConvertedQuantity() != null ? it.getConvertedQuantity() : 0;
+                int saleQty = Math.max(baseQty - converted, 0);
+                BigDecimal pp = it.getProductPrice() != null ? it.getProductPrice() : BigDecimal.ZERO;
+                potentialRevenue = potentialRevenue.add(pp.multiply(BigDecimal.valueOf(saleQty)));
+            }
+            // Display: original products before subdivision, and subdivision lines after subdivision (hide fully-converted originals).
+            displayItems = items.stream()
+                    .filter(it -> {
+                        boolean subdivision = Boolean.TRUE.equals(it.getIsSubdivision());
+                        int baseQty = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : (it.getQuantity() != null ? it.getQuantity() : 0);
+                        int converted = it.getConvertedQuantity() != null ? it.getConvertedQuantity() : 0;
+                        int saleQty = Math.max(baseQty - converted, 0);
+                        return subdivision || saleQty > 0;
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        BigDecimal profitLoss = potentialRevenue.subtract(totalReceivedCost);
 
         return SupplierDeliveryDto.builder()
                 .id(d.getDeliveryId())

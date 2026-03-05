@@ -4,8 +4,10 @@ import com.biasharahub.entity.Order;
 import com.biasharahub.entity.OrderItem;
 import com.biasharahub.entity.Payment;
 import com.biasharahub.entity.Product;
+import com.biasharahub.entity.PurchaseOrder;
 import com.biasharahub.entity.ServiceAppointment;
 import com.biasharahub.entity.Shipment;
+import com.biasharahub.entity.SupplierDelivery;
 import com.biasharahub.entity.User;
 import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.ShipmentRepository;
@@ -275,6 +277,46 @@ public class WhatsAppNotificationService {
         if (phone == null || phone.isBlank()) return;
         String body = "BiasharaHub: Your account has been enabled. You can log in again and receive orders.";
         client.sendMessage(phone, body);
+    }
+
+    /** Notify supplier (via WhatsApp) that a new purchase order has been created for them. */
+    public void notifySupplierPurchaseOrderCreated(PurchaseOrder po) {
+        if (po == null || po.getSupplier() == null) return;
+        String email = po.getSupplier().getEmail();
+        if (email == null || email.isBlank()) return;
+        userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(u -> {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) {
+                String poNumber = po.getPoNumber() != null ? po.getPoNumber() : "PO";
+                String body = String.format("BiasharaHub: New purchase order %s has been created for you. Log in to view and submit your dispatch.", poNumber);
+                client.sendMessage(u.getPhone(), body);
+            }
+        });
+    }
+
+    /** Notify seller (owner + staff) via WhatsApp when a supplier submits a dispatch. */
+    public void notifySellerSupplierDispatched(SupplierDelivery d) {
+        if (d == null || d.getBusinessId() == null) return;
+        String poNumber = d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null;
+        String supplierName = d.getSupplier() != null ? d.getSupplier().getName() : null;
+        String detail = (supplierName != null && !supplierName.isBlank() ? supplierName + " " : "") + (poNumber != null && !poNumber.isBlank() ? "for " + poNumber : "");
+        String body = String.format("BiasharaHub: A supplier has submitted a dispatch%s. Log in to confirm receipt.", detail.isEmpty() ? "" : " " + detail);
+        for (User u : getSellerUsers(d.getBusinessId())) {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) client.sendMessage(u.getPhone(), body);
+        }
+    }
+
+    /** Notify supplier via WhatsApp that the seller has confirmed receipt of their dispatch. */
+    public void notifySupplierDispatchReceiptConfirmed(SupplierDelivery d) {
+        if (d == null || d.getSupplier() == null) return;
+        String email = d.getSupplier().getEmail();
+        if (email == null || email.isBlank()) return;
+        userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(u -> {
+            if (u.getPhone() != null && !u.getPhone().isBlank()) {
+                String poNumber = d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null;
+                String body = String.format("BiasharaHub: The seller has confirmed receipt of your dispatch%s. Thank you.", poNumber != null && !poNumber.isBlank() ? " for " + poNumber : "");
+                client.sendMessage(u.getPhone(), body);
+            }
+        });
     }
 
     public void notifyShipmentUpdated(Shipment shipment) {

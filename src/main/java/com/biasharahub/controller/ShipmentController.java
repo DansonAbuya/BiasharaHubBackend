@@ -9,6 +9,7 @@ import com.biasharahub.dto.response.ShipmentDto;
 import com.biasharahub.dto.response.TrackingInfoDto;
 import com.biasharahub.entity.Order;
 import com.biasharahub.entity.Shipment;
+import com.biasharahub.entity.User;
 import com.biasharahub.repository.OrderRepository;
 import com.biasharahub.repository.ShipmentRepository;
 import com.biasharahub.repository.UserRepository;
@@ -24,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,9 +47,26 @@ public class ShipmentController {
     private final CourierIntegrationService courierIntegrationService;
 
     @GetMapping
+    @Transactional(readOnly = true)
     public ResponseEntity<List<ShipmentDto>> listShipments(@AuthenticationPrincipal AuthenticatedUser user) {
         if (user == null) return ResponseEntity.status(401).<List<ShipmentDto>>build();
-        List<Shipment> shipments = shipmentRepository.findAll();
+        List<Shipment> shipments = new ArrayList<>();
+        String role = user.role() != null ? user.role().toLowerCase() : "";
+        if ("owner".equals(role) || "staff".equals(role)) {
+            UUID businessId = userRepository.findById(user.userId())
+                    .map(User::getBusinessId)
+                    .orElse(null);
+            if (businessId != null) {
+                List<Order> businessOrders = orderRepository.findOrdersContainingProductsByBusinessId(businessId);
+                List<UUID> orderIds = businessOrders.stream().map(Order::getOrderId).distinct().toList();
+                if (!orderIds.isEmpty()) {
+                    shipments = shipmentRepository.findByOrder_OrderIdIn(orderIds);
+                }
+            }
+        } else {
+            shipments = shipmentRepository.findAll();
+        }
+        shipments.sort(Comparator.comparing(Shipment::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
         return ResponseEntity.ok(shipments.stream().map(this::toDto).collect(Collectors.toList()));
     }
 
@@ -113,6 +133,7 @@ public class ShipmentController {
                     }
 
                     Shipment s = builder.build();
+                    userRepository.findById(user.userId()).ifPresent(s::setCreatedBy);
                     s = shipmentRepository.save(s);
                     return ResponseEntity.ok(toDto(s));
                 })

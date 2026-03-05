@@ -4,8 +4,10 @@ import com.biasharahub.entity.Notification;
 import com.biasharahub.entity.Order;
 import com.biasharahub.entity.Payment;
 import com.biasharahub.entity.Product;
+import com.biasharahub.entity.PurchaseOrder;
 import com.biasharahub.entity.ServiceAppointment;
 import com.biasharahub.entity.Shipment;
+import com.biasharahub.entity.SupplierDelivery;
 import com.biasharahub.entity.User;
 import com.biasharahub.entity.OrderItem;
 import com.biasharahub.repository.NotificationRepository;
@@ -282,6 +284,47 @@ public class InAppNotificationService {
         Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
         Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
                 .forEach(u -> saveNotification(u, "payment", title, message, actionUrl));
+    }
+
+    /** Notify supplier user that a new purchase order has been created for them. */
+    public void notifySupplierPurchaseOrderCreated(PurchaseOrder po) {
+        if (po == null || po.getSupplier() == null) return;
+        String email = po.getSupplier().getEmail();
+        if (email == null || email.isBlank()) return;
+        userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(u -> {
+            String poNumber = po.getPoNumber() != null ? po.getPoNumber() : "PO";
+            saveNotification(u, "purchase_order", "New purchase order",
+                    "Purchase order " + poNumber + " has been created for you. Log in to view and submit your dispatch.",
+                    "/dashboard/supplier-dispatches");
+        });
+    }
+
+    /** Notify seller (owner + staff) that a supplier has submitted a dispatch. */
+    public void notifySellerSupplierDispatched(SupplierDelivery d) {
+        if (d == null || d.getBusinessId() == null) return;
+        List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", d.getBusinessId());
+        List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", d.getBusinessId());
+        String poNumber = d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null;
+        String supplierName = d.getSupplier() != null ? d.getSupplier().getName() : null;
+        String message = "A supplier" + (supplierName != null && !supplierName.isBlank() ? " (" + supplierName + ")" : "") + " has submitted a dispatch"
+                + (poNumber != null && !poNumber.isBlank() ? " for " + poNumber : "") + ". Confirm receipt in Deliveries.";
+        String actionUrl = "/dashboard/deliveries";
+        Stream<User> ownerStream = owners != null ? owners.stream() : Stream.empty();
+        Stream<User> staffStream = staff != null ? staff.stream() : Stream.empty();
+        Stream.concat(ownerStream, staffStream).filter(InAppNotificationService::isActive)
+                .forEach(u -> saveNotification(u, "supplier_dispatch", "Supplier dispatch received", message, actionUrl));
+    }
+
+    /** Notify supplier user that the seller has confirmed receipt of their dispatch. */
+    public void notifySupplierDispatchReceiptConfirmed(SupplierDelivery d) {
+        if (d == null || d.getSupplier() == null) return;
+        String email = d.getSupplier().getEmail();
+        if (email == null || email.isBlank()) return;
+        userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(u -> {
+            String poNumber = d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null;
+            String msg = "The seller has confirmed receipt of your dispatch" + (poNumber != null && !poNumber.isBlank() ? " for " + poNumber : "") + ".";
+            saveNotification(u, "dispatch_receipt", "Dispatch receipt confirmed", msg, "/dashboard/supplier-dispatches");
+        });
     }
 
     public void notifyShipmentUpdated(Shipment shipment) {
