@@ -30,6 +30,9 @@ public class PurchaseOrderService {
     private final ProductRepository productRepository;
     private final SupplierDeliveryRepository supplierDeliveryRepository;
     private final UserRepository userRepository;
+    private final MailService mailService;
+    private final InAppNotificationService inAppNotificationService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
 
     @Transactional
     public PurchaseOrderDto create(AuthenticatedUser user, CreatePurchaseOrderRequest request) {
@@ -105,6 +108,33 @@ public class PurchaseOrderService {
         }
 
         po = purchaseOrderRepository.save(po);
+
+        // Notify supplier: email, in-app, WhatsApp
+        Supplier sup = po.getSupplier();
+        if (sup != null) {
+            String supplierEmail = sup.getEmail();
+            String supplierName = sup.getName() != null ? sup.getName() : "Supplier";
+            String poNumber = po.getPoNumber() != null ? po.getPoNumber() : "";
+            String businessName = actor.getBusinessName();
+            try {
+                inAppNotificationService.notifySupplierPurchaseOrderCreated(po);
+            } catch (Exception e) {
+                // log and continue
+            }
+            try {
+                whatsAppNotificationService.notifySupplierPurchaseOrderCreated(po);
+            } catch (Exception e) {
+                // log and continue
+            }
+            if (supplierEmail != null && !supplierEmail.isBlank()) {
+                try {
+                    mailService.sendPurchaseOrderCreatedToSupplier(supplierEmail.trim(), supplierName, poNumber, businessName);
+                } catch (Exception e) {
+                    // log and continue
+                }
+            }
+        }
+
         return toDto(po);
     }
 

@@ -98,20 +98,21 @@ public class AnalyticsController {
     }
 
     /**
-     * Business insights with period filters: daily, weekly, monthly, quarterly, custom.
-     * Returns profit/loss, product performance, staff activity, and period breakdown.
+     * Business insights with period filters: daily, weekly, monthly, quarterly, yearly, custom.
+     * Optional filter by product. Returns profit/loss, product performance, staff performance, and period breakdown.
      */
     @GetMapping("/insights")
     public ResponseEntity<Map<String, Object>> getInsights(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(required = false, defaultValue = "MONTH") String period,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) UUID productId) {
         if (user == null) return ResponseEntity.status(401).build();
         String role = user.role() != null ? user.role().toLowerCase() : "";
         if (!"owner".equals(role) && !"super_admin".equals(role) && !"assistant_admin".equals(role)) {
             return ResponseEntity.status(403).build();
         }
-        return ResponseEntity.ok(businessInsightsService.getInsights(user, period, from, to));
+        return ResponseEntity.ok(businessInsightsService.getInsights(user, period, from, to, productId));
     }
 }

@@ -407,12 +407,17 @@ public class OrderController {
                 .findFirst()
                 .map(Payment::getPaymentId)
                 .orElse(null);
+        UUID orderBusinessId = null;
+        if (o.getItems() != null && !o.getItems().isEmpty() && o.getItems().get(0).getProduct() != null) {
+            orderBusinessId = o.getItems().get(0).getProduct().getBusinessId();
+        }
         return OrderDto.builder()
                 .id(o.getOrderId())
                 .orderId(o.getOrderNumber())
                 .customerId(o.getUser().getUserId())
                 .customerName(o.getUser().getName())
                 .customerEmail(o.getUser().getEmail())
+                .businessId(orderBusinessId != null ? orderBusinessId.toString() : null)
                 .items(o.getItems().stream().map(oi -> OrderItemDto.builder()
                         .productId(oi.getProduct().getProductId())
                         .productName(oi.getProduct().getName())

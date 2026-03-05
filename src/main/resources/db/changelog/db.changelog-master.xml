@@ -76,5 +76,7 @@
     <include file="db/changelog/changes/070-add-food-and-beverages-product-category.sql"/>
     <include file="db/changelog/changes/071-add-source-product-id-to-products.sql"/>
     <include file="db/changelog/changes/072-add-source-product-id-to-create-tenant-schema.sql"/>
+    <include file="db/changelog/changes/073-add-created-by-to-shipments.sql"/>
+    <include file="db/changelog/changes/074-add-created-by-to-shipments-create-tenant-schema.sql"/>
 
 </databaseChangeLog>

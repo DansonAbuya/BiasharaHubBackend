@@ -61,4 +61,14 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
             @Param("businessId") UUID businessId,
             @Param("from") Instant from,
             @Param("toExclusive") Instant toExclusive);
+
+    /** Revenue for a single product in date range (for product filter in insights). */
+    @Query("SELECT COALESCE(SUM(i.quantity * i.priceAtOrder), 0) FROM OrderItem i JOIN i.order o " +
+            "WHERE i.product.businessId = :businessId AND i.product.productId = :productId " +
+            "AND o.orderStatus = 'delivered' AND o.orderedAt >= :from AND o.orderedAt < :toExclusive")
+    BigDecimal sumRevenueByBusinessIdAndProductIdAndDateRange(
+            @Param("businessId") UUID businessId,
+            @Param("productId") UUID productId,
+            @Param("from") Instant from,
+            @Param("toExclusive") Instant toExclusive);
 }
