@@ -14,6 +14,7 @@ target/
 *.iml
 *.ipr
 *.iws
+*.md
 .DS_Store
 
 # Local config with secrets (Gmail OAuth, etc.)

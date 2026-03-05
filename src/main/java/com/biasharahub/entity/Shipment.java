@@ -100,6 +100,12 @@ public class Shipment {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    /** User (owner/staff) who created this shipment; used for staff performance insights. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_user_id")
+    private User createdBy;
+
+
     @PrePersist
     public void prePersist() {
         Instant now = Instant.now();

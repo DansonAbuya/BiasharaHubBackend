@@ -437,6 +437,52 @@ public class MailService {
         send(toEmail, "Update on your business verification – BiasharaHub", text);
     }
 
+    /**
+     * Notify supplier that a new purchase order has been created for them.
+     */
+    public void sendPurchaseOrderCreatedToSupplier(@NonNull String toEmail, @NonNull String supplierName, @NonNull String poNumber, String businessName) {
+        String biz = (businessName != null && !businessName.isBlank()) ? " from " + businessName : "";
+        String text = """
+            Hi %s,
+
+            A new purchase order %s has been created for you%s.
+
+            Log in to BiasharaHub to view the order and submit your dispatch when ready.
+            """.formatted(supplierName, poNumber, biz);
+        send(toEmail, "BiasharaHub: New purchase order " + poNumber, text);
+    }
+
+    /**
+     * Notify seller (owner/staff) that a supplier has submitted a dispatch.
+     */
+    public void sendSupplierDispatchedToSeller(@NonNull String toEmail, @NonNull String sellerName, String supplierName, String poNumber) {
+        String detail = (supplierName != null && !supplierName.isBlank()) ? " from " + supplierName : "";
+        String po = (poNumber != null && !poNumber.isBlank()) ? " for PO " + poNumber : "";
+        String text = """
+            Hi %s,
+
+            A supplier has submitted a dispatch%s%s.
+
+            Log in to BiasharaHub to confirm receipt and process the delivery.
+            """.formatted(sellerName, detail, po);
+        send(toEmail, "BiasharaHub: Supplier dispatch received", text);
+    }
+
+    /**
+     * Notify supplier that the seller has confirmed receipt of their dispatch.
+     */
+    public void sendDispatchReceiptConfirmedToSupplier(@NonNull String toEmail, @NonNull String supplierName, String poNumber) {
+        String po = (poNumber != null && !poNumber.isBlank()) ? " (PO " + poNumber + ")" : "";
+        String text = """
+            Hi %s,
+
+            The seller has confirmed receipt of your dispatch%s.
+
+            Thank you for your delivery.
+            """.formatted(supplierName, po);
+        send(toEmail, "BiasharaHub: Dispatch receipt confirmed", text);
+    }
+
     private void sendSafe(EmailMessage message, String description, String toEmail) {
         try {
             emailSender.send(message);

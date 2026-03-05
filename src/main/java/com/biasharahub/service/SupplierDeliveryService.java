@@ -43,6 +43,9 @@ public class SupplierDeliveryService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final UserRepository userRepository;
     private final StockLedgerService stockLedgerService;
+    private final MailService mailService;
+    private final InAppNotificationService inAppNotificationService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
 
     @Transactional(readOnly = true)
     public List<SupplierDeliveryDto> listMyBusinessDeliveries(AuthenticatedUser user) {
@@ -173,7 +176,35 @@ public class SupplierDeliveryService {
                     .build();
             supplierDeliveryItemRepository.save(item);
         }
+
+        // Notify seller: email, in-app, WhatsApp
+        try {
+            inAppNotificationService.notifySellerSupplierDispatched(d);
+        } catch (Exception e) { /* continue */ }
+        try {
+            whatsAppNotificationService.notifySellerSupplierDispatched(d);
+        } catch (Exception e) { /* continue */ }
+        notifySellerSupplierDispatchedEmail(d);
+
         return get(user, d.getDeliveryId());
+    }
+
+    private void notifySellerSupplierDispatchedEmail(SupplierDelivery d) {
+        if (d == null || d.getBusinessId() == null) return;
+        java.util.List<User> owners = userRepository.findByRoleIgnoreCaseAndBusinessId("owner", d.getBusinessId());
+        java.util.List<User> staff = userRepository.findByRoleIgnoreCaseAndBusinessId("staff", d.getBusinessId());
+        String supplierName = d.getSupplier() != null ? d.getSupplier().getName() : null;
+        String poNumber = d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null;
+        java.util.stream.Stream.concat(
+                owners != null ? owners.stream() : java.util.stream.Stream.empty(),
+                staff != null ? staff.stream() : java.util.stream.Stream.empty()
+        ).filter(u -> u.getAccountStatus() == null || "active".equalsIgnoreCase(u.getAccountStatus()))
+                .filter(u -> u.getEmail() != null && !u.getEmail().isBlank())
+                .forEach(u -> {
+                    try {
+                        mailService.sendSupplierDispatchedToSeller(u.getEmail(), u.getName() != null ? u.getName() : "Seller", supplierName, poNumber);
+                    } catch (Exception e) { /* skip */ }
+                });
     }
 
     @Transactional
@@ -268,6 +299,21 @@ public class SupplierDeliveryService {
                 po.setStatus("FULFILLED");
                 purchaseOrderRepository.save(po);
             }
+        }
+
+        // Notify supplier: email, in-app, WhatsApp
+        try {
+            inAppNotificationService.notifySupplierDispatchReceiptConfirmed(d);
+        } catch (Exception e) { /* continue */ }
+        try {
+            whatsAppNotificationService.notifySupplierDispatchReceiptConfirmed(d);
+        } catch (Exception e) { /* continue */ }
+        Supplier sup = d.getSupplier();
+        if (sup != null && sup.getEmail() != null && !sup.getEmail().isBlank()) {
+            try {
+                String poNumber = d.getPurchaseOrder() != null ? d.getPurchaseOrder().getPoNumber() : null;
+                mailService.sendDispatchReceiptConfirmedToSupplier(sup.getEmail().trim(), sup.getName() != null ? sup.getName() : "Supplier", poNumber);
+            } catch (Exception e) { /* continue */ }
         }
 
         return get(user, deliveryId);
