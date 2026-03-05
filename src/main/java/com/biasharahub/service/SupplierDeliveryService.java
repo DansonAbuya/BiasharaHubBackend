@@ -576,9 +576,21 @@ public class SupplierDeliveryService {
         BigDecimal totalCost = items.stream()
                 .map(it -> it.getLineTotal() != null ? it.getLineTotal() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalReceivedCost = items.stream()
-                .map(it -> it.getReceivedLineTotal() != null ? it.getReceivedLineTotal() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Total received cost: count each cost once. For originals use only unconverted qty × unitCost;
+        // for subdivisions use their receivedLineTotal (cost of the converted portion). Avoids double-counting.
+        BigDecimal totalReceivedCost = BigDecimal.ZERO;
+        for (SupplierDeliveryItemDto it : items) {
+            if (Boolean.TRUE.equals(it.getIsSubdivision())) {
+                totalReceivedCost = totalReceivedCost.add(it.getReceivedLineTotal() != null ? it.getReceivedLineTotal() : BigDecimal.ZERO);
+            } else {
+                int baseQty = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : (it.getQuantity() != null ? it.getQuantity() : 0);
+                int converted = it.getConvertedQuantity() != null ? it.getConvertedQuantity() : 0;
+                int unconverted = Math.max(baseQty - converted, 0);
+                BigDecimal uc = it.getUnitCost() != null ? it.getUnitCost() : BigDecimal.ZERO;
+                totalReceivedCost = totalReceivedCost.add(uc.multiply(BigDecimal.valueOf(unconverted)));
+            }
+        }
 
         // Potential revenue is based on the quantities that will actually be sold:
         // - For original supplier-facing items, only the unconverted quantity
@@ -597,6 +609,19 @@ public class SupplierDeliveryService {
         }
         BigDecimal profitLoss = potentialRevenue.subtract(totalReceivedCost);
 
+        // For display: exclude original (non-subdivision) items that are fully converted,
+        // so we only show subdivision lines and originals that still have unconverted qty.
+        // P&L above uses the full list; display uses this filtered list to avoid double-counting in the UI.
+        List<SupplierDeliveryItemDto> displayItems = items.stream()
+                .filter(it -> {
+                    boolean subdivision = Boolean.TRUE.equals(it.getIsSubdivision());
+                    int baseQty = it.getReceivedQuantity() != null ? it.getReceivedQuantity() : (it.getQuantity() != null ? it.getQuantity() : 0);
+                    int converted = it.getConvertedQuantity() != null ? it.getConvertedQuantity() : 0;
+                    int saleQty = Math.max(baseQty - converted, 0);
+                    return subdivision || saleQty > 0;
+                })
+                .collect(Collectors.toList());
+
         return SupplierDeliveryDto.builder()
                 .id(d.getDeliveryId())
                 .businessId(d.getBusinessId())
@@ -612,7 +637,7 @@ public class SupplierDeliveryService {
                 .status(d.getStatus())
                 .stockUpdatedAt(d.getStockUpdatedAt())
                 .createdAt(d.getCreatedAt())
-                .items(items)
+                .items(displayItems)
                 .totalQuantity(totalQty)
                 .totalCost(totalCost.setScale(2, RoundingMode.HALF_UP))
                 .totalReceivedCost(totalReceivedCost.setScale(2, RoundingMode.HALF_UP))
@@ -628,10 +653,12 @@ public class SupplierDeliveryService {
         BigDecimal lineTotal = uc.multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
         BigDecimal receivedLineTotal = uc.multiply(BigDecimal.valueOf(rq)).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal productPrice = i.getProduct() != null ? i.getProduct().getPrice() : null;
+        Product p = i.getProduct();
+        BigDecimal productPrice = p != null ? p.getPrice() : null;
+        boolean isSubdivision = p != null && p.getSourceProductId() != null;
         return SupplierDeliveryItemDto.builder()
                 .id(i.getItemId())
-                .productId(i.getProduct() != null ? i.getProduct().getProductId() : null)
+                .productId(p != null ? p.getProductId() : null)
                 .productName(i.getProductName())
                 .quantity(i.getQuantity())
                 .receivedQuantity(i.getReceivedQuantity())
@@ -641,6 +668,7 @@ public class SupplierDeliveryService {
                 .lineTotal(lineTotal)
                 .receivedLineTotal(receivedLineTotal)
                 .productPrice(productPrice)
+                .isSubdivision(isSubdivision)
                 .createdAt(i.getCreatedAt())
                 .build();
     }
