@@ -572,8 +572,14 @@ public class SupplierDeliveryService {
     }
 
     private SupplierDeliveryDto toDto(SupplierDelivery d, List<SupplierDeliveryItemDto> items) {
-        int totalQty = items.stream().mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 0).sum();
+        // Supply quantity and supply cost: only original (non-subdivision) items — what the supplier actually sent.
+        // Subdivisions are the same supply relabelled, so we don't add them here.
+        int totalQty = items.stream()
+                .filter(it -> !Boolean.TRUE.equals(it.getIsSubdivision()))
+                .mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 0)
+                .sum();
         BigDecimal totalCost = items.stream()
+                .filter(it -> !Boolean.TRUE.equals(it.getIsSubdivision()))
                 .map(it -> it.getLineTotal() != null ? it.getLineTotal() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
