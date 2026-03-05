@@ -23,6 +23,8 @@ public class SupplierDeliveryItemDto {
     private Integer receivedQuantity;
     /** Cost per unit (supplier stated). */
     private BigDecimal unitCost;
+    /** Unit of measure for quantity (e.g. kg, g, piece). */
+    private String unitOfMeasure;
     /** Line total: quantity × unitCost (supplier stated). */
     private BigDecimal lineTotal;
     /** Received line total: receivedQuantity × unitCost (for P&L). */

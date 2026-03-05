@@ -19,5 +19,8 @@ public class AddSupplierDeliveryItemRequest {
 
     @DecimalMin(value = "0.00", inclusive = true, message = "Unit cost must be non-negative")
     private BigDecimal unitCost;
+
+    /** Unit of measure (e.g. kg, g, L, piece). Visible to seller for pricing and subdivision. */
+    private String unitOfMeasure;
 }
 
