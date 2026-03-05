@@ -8,6 +8,7 @@ import java.util.UUID;
 /**
  * Request to convert part of a received delivery item into a separate sale product/units.
  * Used when the seller wants to subdivide bulk stock into smaller units of sale.
+ * Supports two modes: (1) pieces per unit (e.g. 3 fillets per fish), (2) unit-based (e.g. 10 kg → 500 g sub-units).
  */
 @Data
 public class ConvertDeliveryItemRequest {
@@ -25,13 +26,13 @@ public class ConvertDeliveryItemRequest {
 
     /**
      * Optional override for customer-facing price per unit for the sale product.
-     * If null, the system will calculate a default from the supplier cost and subdivision size.
+     * If null, the system will calculate a default from the supplier cost and subdivision size (no loss).
      */
     private BigDecimal targetPrice;
 
     /**
      * Optional explicit number of sale units to create for the target product.
-     * If null and piecesPerUnit is provided, the system will derive this value.
+     * If null, derived from piecesPerUnit or from targetUnitSize + targetUnit when source has a unit.
      */
     private Integer producedQuantity;
 
@@ -44,10 +45,22 @@ public class ConvertDeliveryItemRequest {
     /**
      * "Size" of each subdivision expressed as how many pieces/units you get from
      * a single source unit. For example, if each fish is cut into 3 fillets, this
-     * value is 3. When provided, the system will derive producedQuantity and a
-     * default unit price from the supplier cost.
+     * value is 3. When provided (and not using targetUnitSize/targetUnit), the system
+     * derives producedQuantity and a default unit price from the supplier cost.
      */
     private Integer piecesPerUnit;
+
+    /**
+     * For unit-based subdivision: size of each sub-unit in the target unit (e.g. 500 for "500 grams").
+     * Use with targetUnit. Example: 10 kg supplied at 2000/kg → subdivide into 500 g → 20 sub-units, cost 1000 per 500 g.
+     */
+    private BigDecimal targetUnitSize;
+
+    /**
+     * For unit-based subdivision: unit of each sub-unit (e.g. "g", "kg", "L", "ml", "piece").
+     * Must be compatible with the source item's unit for conversion (e.g. kg and g).
+     */
+    private String targetUnit;
 
     /**
      * Optional note for the conversion, stored in the stock ledger.

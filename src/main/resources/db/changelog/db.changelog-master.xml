@@ -66,5 +66,8 @@
     <include file="db/changelog/changes/060-tenant-purchase-orders-table.sql"/>
     <include file="db/changelog/changes/061-add-purchase-order-id-to-supplier-deliveries.sql"/>
     <include file="db/changelog/changes/062-add-stock-updated-at-supplier-deliveries.sql"/>
+    <include file="db/changelog/changes/063-add-stock-updated-at-to-create-tenant-schema.sql"/>
+    <include file="db/changelog/changes/064-add-unit-of-measure-to-supplier-delivery-items.sql"/>
+    <include file="db/changelog/changes/065-add-unit-of-measure-to-create-tenant-schema.sql"/>
 
 </databaseChangeLog>
