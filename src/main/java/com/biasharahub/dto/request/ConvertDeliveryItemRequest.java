@@ -6,21 +6,23 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Request to convert part of a received delivery item into a separate sale product/units.
- * Used when the seller wants to subdivide bulk stock into smaller units of sale.
+ * Request to convert part of a received delivery item into customer-facing sale units.
+ * Subdivision is the customer-facing name for the product; the supplier-facing name remains the original.
+ * One supplier-facing product can be divided into several subdivisions (e.g. 500g, 1kg, fillet).
  * Supports two modes: (1) pieces per unit (e.g. 3 fillets per fish), (2) unit-based (e.g. 10 kg → 500 g sub-units).
  */
 @Data
 public class ConvertDeliveryItemRequest {
 
     /**
-     * Optional existing target product. If not provided, a new product will be created
+     * Optional existing target product. If not provided, a new customer-facing product will be created
      * using targetName/targetPrice.
      */
     private UUID targetProductId;
 
     /**
-     * Name for the sale product (customer-facing). Required when targetProductId is null.
+     * Customer-facing name for this subdivision (e.g. "Tilapia 500g"). The supplier-facing name
+     * stays on the original product. Required when targetProductId is null.
      */
     private String targetName;
 
