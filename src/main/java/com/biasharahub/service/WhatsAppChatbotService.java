@@ -709,9 +709,11 @@ public class WhatsAppChatbotService {
         return replyStockForShop(phone, businessId, shopName);
     }
 
-    /** Products from one shop. Prices are per item. Stores list for "ORDER 1 2". */
+    /** Products from one shop. Prices are per item. Stores list for "ORDER 1 2". Customer-facing only (subdivisions, not originals). */
     private String replyStockForShop(String phone, UUID businessId, String shopName) {
-        List<Product> products = productRepository.findByBusinessId(businessId);
+        List<Product> products = productRepository.findCustomerFacingByBusinessId(businessId).stream()
+                .filter(p -> "approved".equalsIgnoreCase(p.getModerationStatus()))
+                .toList();
         if (products.isEmpty()) {
             return (shopName != null ? shopName + ": " : "") + "No products in stock right now. Reply SHOPS to see other shops, or MENU for main menu.";
         }
@@ -741,9 +743,11 @@ public class WhatsAppChatbotService {
         return replyShops();
     }
 
-    /** All products (all shops). Prices per item. Stores list for "ORDER 1 2". */
+    /** All products (all shops). Prices per item. Stores list for "ORDER 1 2". Customer-facing only (subdivisions, not originals). */
     private String replyStock(String phone) {
-        List<Product> products = productRepository.findAllWithImages();
+        List<Product> products = productRepository.findCustomerFacingAll().stream()
+                .filter(p -> "approved".equalsIgnoreCase(p.getModerationStatus()))
+                .toList();
         if (products.isEmpty()) {
             return "We don't have any products in stock right now. Reply SHOPS to see shops, or MENU for main menu, or visit " + storefrontUrl;
         }

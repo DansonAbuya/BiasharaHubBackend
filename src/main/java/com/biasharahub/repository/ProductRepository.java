@@ -46,5 +46,22 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     /** List all subdivisions (customer-facing products) for a given parent product. */
     List<Product> findByBusinessIdAndSourceProductIdOrderByNameAsc(UUID businessId, UUID sourceProductId);
 
+    /**
+     * Products visible to customers for a single shop: exclude supplier-facing-only, and exclude
+     * originals that have subdivisions (show subdivisions only, not the raw product).
+     */
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images WHERE p.businessId = :businessId "
+            + "AND p.supplierFacingOnly = false AND (p.sourceProductId IS NOT NULL OR "
+            + "NOT EXISTS (SELECT 1 FROM Product p2 WHERE p2.sourceProductId = p.productId))")
+    List<Product> findCustomerFacingByBusinessId(@Param("businessId") UUID businessId);
+
+    /**
+     * All products visible to customers (all shops): exclude supplier-facing-only, and exclude
+     * originals that have subdivisions (show subdivisions only).
+     */
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images WHERE p.supplierFacingOnly = false "
+            + "AND (p.sourceProductId IS NOT NULL OR NOT EXISTS (SELECT 1 FROM Product p2 WHERE p2.sourceProductId = p.productId))")
+    List<Product> findCustomerFacingAll();
+
     boolean existsByProductIdAndBusinessId(UUID productId, UUID businessId);
 }
